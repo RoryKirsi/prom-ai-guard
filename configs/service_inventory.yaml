@@ -1,0 +1,26 @@
+schema_version: v1
+services:
+  - namespace: payments
+    service: payment-api
+    jobs:
+      - payment-api
+      - payment-metrics
+    owner: platform-observability
+    team: payments
+    aliases:
+      - pay-api
+    criticality: high
+  - namespace: orders
+    service: order-api
+    jobs:
+      - order-api
+    owner: orders-team
+    team: orders
+    criticality: medium
+  - namespace: platform
+    service: node-exporter
+    jobs:
+      - node
+    owner: platform-sre
+    team: platform
+    criticality: low

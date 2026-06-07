@@ -25,14 +25,18 @@ type Source struct {
 	MetricNameCount int    `json:"metric_name_count"`
 }
 
-// Report is the top-level analysis_report.json structure. Slice 1 populates the
-// identity, source, summary and warnings fields.
+// Report is the top-level analysis_report.json structure. Slice 2 adds
+// config_hash, the rule-derived invalid_metrics and the top lists.
 type Report struct {
-	SchemaVersion string               `json:"schema_version"`
-	ScanID        string               `json:"scan_id"`
-	ScanTime      string               `json:"scan_time"`
-	ToolVersion   string               `json:"tool_version"`
-	Source        Source               `json:"source"`
-	Summary       scan.Summary         `json:"summary"`
-	Warnings      []model.ParseWarning `json:"warnings"`
+	SchemaVersion      string                 `json:"schema_version"`
+	ScanID             string                 `json:"scan_id"`
+	ScanTime           string                 `json:"scan_time"`
+	ToolVersion        string                 `json:"tool_version"`
+	ConfigHash         string                 `json:"config_hash"`
+	Source             Source                 `json:"source"`
+	Summary            scan.Summary           `json:"summary"`
+	InvalidMetrics     []model.MetricAnalysis `json:"invalid_metrics"`
+	TopRiskMetrics     []model.RiskRef        `json:"top_risk_metrics"`
+	TopViolationLabels []model.LabelViolation `json:"top_violation_labels"`
+	Warnings           []model.ParseWarning   `json:"warnings"`
 }

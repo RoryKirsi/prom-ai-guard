@@ -1,0 +1,19 @@
+schema_version: v1
+thresholds:
+  high_cardinality_label_values: 100
+  high_cardinality_metric_series: 1000
+patterns:
+  deprecated_metric_names:
+    - ".*deprecated.*"
+    - ".*legacy.*"
+  debug_metric_names:
+    - ".*debug.*"
+    - ".*test.*"
+    - ".*temp.*"
+  forbidden_label_keys:
+    - user_id
+    - session_id
+    - trace_id
+    - request_id
+    - password
+    - token

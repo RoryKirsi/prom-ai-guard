@@ -1,5 +1,6 @@
 # HELP http_requests_total The total number of HTTP requests.
 # TYPE http_requests_total counter
+# --- Valid metrics: resolve to service_inventory, no rule hits. ---
 http_requests_total{method="GET",code="200",service="payment-api"} 1027
 http_requests_total{method="POST",code="200",service="payment-api"} 342
 http_requests_total{method="GET",code="500",service="payment-api"} 12
@@ -7,16 +8,32 @@ http_requests_total{method="GET",code="500",service="payment-api"} 12
 # HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
 # TYPE process_cpu_seconds_total counter
 process_cpu_seconds_total 87654.32
-
-# A metric with an empty label value (legal to parse; flagged by rules later).
-queue_depth{env="",service="order-api"} 0
-
-# Scientific notation and a trailing timestamp are both accepted.
 go_memstats_alloc_bytes 1.2345e7
 node_load1{instance="node-1"} 0.42 1700000000000
 
-# Legacy / deprecated-style names parse fine; classification is a later slice.
-api_legacy_latency_seconds{service="order-api"} 0.13
+# --- 1. deprecated_metric: name matches .*legacy.* ---
+order_legacy_latency_seconds{service="order-api"} 0.13
+
+# --- 2. meaningless_metric: name matches .*debug.* ---
+debug_trace_count{service="order-api"} 3
+
+# --- 3. empty_label_value: env has an empty value ---
+queue_depth{service="order-api",env=""} 0
+
+# --- 4. invalid_label_name: 'route:path' violates [a-zA-Z_][a-zA-Z0-9_]* ---
+cache_hits_total{service="order-api",route:path="/checkout"} 10
+
+# --- 5. duplicate_metric: identical name + label set repeated (fingerprint) ---
+dup_orders_total{service="order-api",shard="a"} 5
+dup_orders_total{service="order-api",shard="a"} 5
+
+# --- 6. orphan_metric: service 'ghost-api' is not in service_inventory ---
+ghost_exporter_up{service="ghost-api"} 1
+
+# --- 7. high_cardinality: forbidden label key user_id ---
+http_user_requests_total{service="payment-api",user_id="u1"} 1
+http_user_requests_total{service="payment-api",user_id="u2"} 1
+http_user_requests_total{service="payment-api",user_id="u3"} 1
 
 # --- Intentionally malformed lines: each must yield a warning, not abort. ---
 this is not a metric line
