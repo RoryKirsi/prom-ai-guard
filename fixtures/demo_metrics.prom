@@ -1,0 +1,24 @@
+# HELP http_requests_total The total number of HTTP requests.
+# TYPE http_requests_total counter
+http_requests_total{method="GET",code="200",service="payment-api"} 1027
+http_requests_total{method="POST",code="200",service="payment-api"} 342
+http_requests_total{method="GET",code="500",service="payment-api"} 12
+
+# HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
+# TYPE process_cpu_seconds_total counter
+process_cpu_seconds_total 87654.32
+
+# A metric with an empty label value (legal to parse; flagged by rules later).
+queue_depth{env="",service="order-api"} 0
+
+# Scientific notation and a trailing timestamp are both accepted.
+go_memstats_alloc_bytes 1.2345e7
+node_load1{instance="node-1"} 0.42 1700000000000
+
+# Legacy / deprecated-style names parse fine; classification is a later slice.
+api_legacy_latency_seconds{service="order-api"} 0.13
+
+# --- Intentionally malformed lines: each must yield a warning, not abort. ---
+this is not a metric line
+http_requests_total{method=} 3
+broken_value{service="x"} not_a_number
