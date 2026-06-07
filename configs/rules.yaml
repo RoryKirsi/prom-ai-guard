@@ -3,13 +3,15 @@ thresholds:
   high_cardinality_label_values: 100
   high_cardinality_metric_series: 1000
 patterns:
+  # Token-boundary matches: a token is delimited by start/end of name or by
+  # '_' / ':'. This flags my_legacy_total but not latest/fastest/temperature.
   deprecated_metric_names:
-    - ".*deprecated.*"
-    - ".*legacy.*"
+    - "(^|[_:])deprecated([_:]|$)"
+    - "(^|[_:])legacy([_:]|$)"
   debug_metric_names:
-    - ".*debug.*"
-    - ".*test.*"
-    - ".*temp.*"
+    - "(^|[_:])debug([_:]|$)"
+    - "(^|[_:])test([_:]|$)"
+    - "(^|[_:])temp([_:]|$)"
   forbidden_label_keys:
     - user_id
     - session_id

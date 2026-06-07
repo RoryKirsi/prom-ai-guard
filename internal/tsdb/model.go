@@ -133,6 +133,21 @@ func (m *MetricStat) DistinctValues(key string) int {
 	return len(m.labelValues[key])
 }
 
+// SampleValues returns up to limit distinct values for a label key, sorted
+// ascending. limit <= 0 returns all values.
+func (m *MetricStat) SampleValues(key string, limit int) []string {
+	set := m.labelValues[key]
+	out := make([]string, 0, len(set))
+	for v := range set {
+		out = append(out, v)
+	}
+	sort.Strings(out)
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out
+}
+
 // HasEmptyValue reports whether the label key ever had an empty value.
 func (m *MetricStat) HasEmptyValue(key string) bool {
 	return m.emptyValue[key]

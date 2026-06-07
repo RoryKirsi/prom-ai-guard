@@ -153,6 +153,58 @@ func TestParseOptionalTimestamp(t *testing.T) {
 	}
 }
 
+func TestLongLineWarnsAndContinues(t *testing.T) {
+	// good line, an overlong line, good line => 2 series, 1 warning, no error.
+	overlong := strings.Repeat("a", maxLineBytes+1)
+	in := "good_one 1\n" + overlong + "\ngood_two 2\n"
+	series, warns, err := ParseReader(strings.NewReader(in))
+	if err != nil {
+		t.Fatalf("oversized line must not be a fatal error, got %v", err)
+	}
+	if len(series) != 2 {
+		t.Fatalf("expected 2 parsed series, got %d: %+v", len(series), series)
+	}
+	if len(warns) != 1 {
+		t.Fatalf("expected 1 warning, got %d: %+v", len(warns), warns)
+	}
+	if warns[0].Line != 2 {
+		t.Errorf("warning line = %d, want 2", warns[0].Line)
+	}
+	if !strings.Contains(warns[0].Reason, "exceeds") {
+		t.Errorf("unexpected reason: %q", warns[0].Reason)
+	}
+	if len(warns[0].Raw) > 200 {
+		t.Errorf("warning Raw should be truncated, got %d bytes", len(warns[0].Raw))
+	}
+}
+
+func TestDuplicateLabelKeyWarns(t *testing.T) {
+	series, warns, _ := ParseReader(strings.NewReader(`m{a="x",a="y"} 1`))
+	if len(series) != 0 {
+		t.Fatalf("duplicate label key should not produce a series, got %+v", series)
+	}
+	if len(warns) != 1 || !strings.Contains(warns[0].Reason, "duplicate label name") {
+		t.Fatalf("expected duplicate-label warning, got %+v", warns)
+	}
+}
+
+func TestRejectGoNumericSyntax(t *testing.T) {
+	for _, in := range []string{"m 1_000", "m 0x1p4"} {
+		series, warns, _ := ParseReader(strings.NewReader(in))
+		if len(series) != 0 {
+			t.Errorf("%q should be rejected, got series %+v", in, series)
+		}
+		if len(warns) != 1 {
+			t.Errorf("%q should warn once, got %+v", in, warns)
+		}
+	}
+	// A valid decimal/scientific value is still accepted.
+	series, _, _ := ParseReader(strings.NewReader("m 1.5e3"))
+	if len(series) != 1 || series[0].Value != 1500 {
+		t.Errorf("valid value rejected: %+v", series)
+	}
+}
+
 func TestParseEmptyLabelValueIsValid(t *testing.T) {
 	// Empty label values are legal Prometheus syntax; flagging them as invalid
 	// is a rule concern for a later slice, not a parse error.

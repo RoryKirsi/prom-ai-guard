@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 )
@@ -68,8 +69,10 @@ func LoadInventory(path string) (Inventory, error) {
 	return inv, nil
 }
 
-// HashFiles returns sha256:<hex> over the concatenated raw bytes of the given
-// files in the order provided. Used to stamp config_hash into the report.
+// HashFiles returns sha256:<hex> over the given files in the order provided.
+// Each file contributes its base name, byte length and content, separated by
+// NUL bytes, so that concatenation is unambiguous (no boundary collision
+// between two different file sets) and a file's identity is part of the hash.
 func HashFiles(paths ...string) (string, error) {
 	h := sha256.New()
 	for _, p := range paths {
@@ -77,7 +80,9 @@ func HashFiles(paths ...string) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("hashing config %s: %w", p, err)
 		}
+		fmt.Fprintf(h, "%s\x00%d\x00", filepath.Base(p), len(data))
 		h.Write(data)
+		h.Write([]byte{0x00})
 	}
 	return "sha256:" + hex.EncodeToString(h.Sum(nil)), nil
 }

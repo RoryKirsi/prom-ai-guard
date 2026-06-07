@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"strings"
 	"testing"
 
 	"prom-ai-guard/internal/config"
@@ -12,8 +13,9 @@ func testRules() config.Rules {
 	var r config.Rules
 	r.Thresholds.HighCardinalityLabelValues = 100
 	r.Thresholds.HighCardinalityMetricSeries = 1000
-	r.Patterns.DeprecatedMetricNames = []string{".*deprecated.*", ".*legacy.*"}
-	r.Patterns.DebugMetricNames = []string{".*debug.*", ".*test.*", ".*temp.*"}
+	// Token-boundary patterns, matching the shipped configs/rules.yaml.
+	r.Patterns.DeprecatedMetricNames = []string{"(^|[_:])deprecated([_:]|$)", "(^|[_:])legacy([_:]|$)"}
+	r.Patterns.DebugMetricNames = []string{"(^|[_:])debug([_:]|$)", "(^|[_:])test([_:]|$)", "(^|[_:])temp([_:]|$)"}
 	r.Patterns.ForbiddenLabelKeys = []string{"user_id", "session_id", "trace_id", "request_id", "password", "token"}
 	return r
 }
@@ -204,6 +206,64 @@ func TestRequiredFieldsPopulated(t *testing.T) {
 	}
 	if a.SeriesCount != 1 || a.LabelCardinality["user_id"] != 1 {
 		t.Errorf("stats wrong: series=%d card=%v", a.SeriesCount, a.LabelCardinality)
+	}
+}
+
+func TestRegexNoFalsePositives(t *testing.T) {
+	// These legitimate names must NOT be flagged deprecated or meaningless by
+	// the token-boundary patterns (they merely contain test/temp/legacy as
+	// substrings inside latest/fastest/temperature/attempt).
+	for _, name := range []string{
+		"http_latest_total",
+		"fastest_response_seconds",
+		"node_temperature_celsius",
+		"attempt_count",
+	} {
+		analyses := evalSeries(t,
+			model.MetricSeries{MetricName: name, Labels: map[string]string{"service": "order-api"}, Value: 1},
+		)
+		if a, ok := find(analyses, name); ok {
+			if hasType(a, TypeDeprecated) || hasType(a, TypeMeaningless) {
+				t.Errorf("%s wrongly flagged: %v", name, a.InvalidTypes)
+			}
+		}
+	}
+}
+
+func TestOrphanSignalOmitsRawValue(t *testing.T) {
+	a := mustFind(t, evalSeries(t,
+		model.MetricSeries{MetricName: "ghost_exporter_up", Labels: map[string]string{"service": "ghost-api"}, Value: 1},
+	), "ghost_exporter_up")
+	for _, sig := range a.RuleSignals {
+		if strings.Contains(sig, "ghost-api") {
+			t.Errorf("rule signal must not embed raw service value: %q", sig)
+		}
+	}
+	found := false
+	for _, sig := range a.RuleSignals {
+		if sig == "service:orphan" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected signal 'service:orphan', got %v", a.RuleSignals)
+	}
+}
+
+func TestOwnerContextConsistentForMultiService(t *testing.T) {
+	// A metric carrying two service values where only the second resolves: the
+	// owner/service/namespace triple must all come from the matched entry, never
+	// pairing owner from one service with the name of another.
+	inv := config.Inventory{Services: []config.Service{
+		{Service: "zeta", Namespace: "ns-z", Owner: "team-z"},
+	}}
+	stats := tsdb.Build([]model.MetricSeries{
+		{MetricName: "m", Labels: map[string]string{"service": "alpha"}, Value: 1},
+		{MetricName: "m", Labels: map[string]string{"service": "zeta"}, Value: 1},
+	})
+	c := Contexts(stats, inv)["m"]
+	if c.Owner != "team-z" || c.Service != "zeta" || c.Namespace != "ns-z" {
+		t.Errorf("inconsistent owner context: %+v (must all derive from matched 'zeta')", c)
 	}
 }
 

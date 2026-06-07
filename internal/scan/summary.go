@@ -105,6 +105,11 @@ func topRisk(invalids []model.MetricAnalysis) []model.RiskRef {
 }
 
 // topViolationLabels aggregates contributions by (label_key, invalid_type).
+//
+// This list is label-scoped by design: only the rule types that implicate a
+// specific label (empty_label_value, invalid_label_name, high_cardinality)
+// contribute. Whole-metric types (deprecated/duplicate/meaningless/orphan) have
+// no offending label and appear in invalid_metrics / top_risk_metrics instead.
 func topViolationLabels(contribs []model.LabelContribution) []model.LabelViolation {
 	type key struct{ labelKey, invalidType string }
 	type acc struct {

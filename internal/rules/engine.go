@@ -140,11 +140,12 @@ func evaluateMetric(st *tsdb.MetricStat, cfg config.Rules, deprecated, debug []*
 			signals = append(signals, fmt.Sprintf("metric:series=%d", st.SeriesCount))
 		}
 	}
-	// orphan_metric
+	// orphan_metric. The signal intentionally omits the raw service value so no
+	// label value is embedded in rule_signals (the metric_name identifies it).
 	matched, orphanVal := resolveOwner(st, index)
 	if orphanVal != "" {
 		types = append(types, TypeOrphan)
-		signals = append(signals, fmt.Sprintf("service:%s:orphan", orphanVal))
+		signals = append(signals, "service:orphan")
 	}
 
 	a := model.MetricAnalysis{
@@ -227,6 +228,10 @@ func invalidLabelKeys(keys []string) []string {
 
 // highCardinality returns the offending label keys (forbidden or over-threshold
 // value cardinality) and whether the metric's series count crosses the limit.
+//
+// The threshold comparison is `>=` by design: a metric that reaches exactly the
+// configured limit is treated as high cardinality (the limit is the maximum
+// acceptable value, not the first rejected one).
 func highCardinality(st *tsdb.MetricStat, cfg config.Rules, forbidden map[string]bool) ([]string, bool) {
 	var keys []string
 	seen := map[string]bool{}
@@ -258,7 +263,15 @@ func resolveOwner(st *tsdb.MetricStat, index map[string]config.Service) (*config
 	return nil, ids[0]
 }
 
+// ownerContext returns a consistent owner/service/namespace triple. When the
+// metric resolves to an inventory entry, all three come from that same matched
+// entry so the service name is never paired with a different service's owner or
+// namespace (e.g. for a metric carrying multiple service label values). When it
+// does not resolve, the metric's own label values are used and owner is unknown.
 func ownerContext(st *tsdb.MetricStat, matched *config.Service) (owner, service, namespace string) {
+	if matched != nil {
+		return matched.Owner, matched.Service, matched.Namespace
+	}
 	if svcs := st.ServiceValues(); len(svcs) > 0 {
 		service = svcs[0]
 	} else if jobs := st.JobValues(); len(jobs) > 0 {
@@ -267,13 +280,7 @@ func ownerContext(st *tsdb.MetricStat, matched *config.Service) (owner, service,
 	if ns := st.NamespaceValues(); len(ns) > 0 {
 		namespace = ns[0]
 	}
-	switch {
-	case matched != nil:
-		owner = matched.Owner
-		if namespace == "" {
-			namespace = matched.Namespace
-		}
-	case service != "":
+	if service != "" {
 		owner = "unknown"
 	}
 	return owner, service, namespace

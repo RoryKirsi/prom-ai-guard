@@ -51,3 +51,13 @@ type LabelContribution struct {
 	RiskScore   int
 	SeriesCount int
 }
+
+// MetricContext is the inventory-resolved ownership context for a metric,
+// shared by the rule engine and the MetricProfile builder so owner/service/
+// namespace stay consistent between the report and the AI input preview.
+type MetricContext struct {
+	Owner     string
+	Service   string
+	Namespace string
+	Jobs      []string
+}

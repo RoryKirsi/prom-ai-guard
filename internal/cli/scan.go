@@ -9,12 +9,19 @@ import (
 	"github.com/spf13/cobra"
 
 	"prom-ai-guard/internal/config"
+	"prom-ai-guard/internal/model"
 	"prom-ai-guard/internal/parser"
+	"prom-ai-guard/internal/profile"
+	"prom-ai-guard/internal/redact"
 	"prom-ai-guard/internal/report"
 	"prom-ai-guard/internal/rules"
 	"prom-ai-guard/internal/scan"
 	"prom-ai-guard/internal/tsdb"
 )
+
+// sampleValuesPerLabel bounds how many sample label values a MetricProfile
+// carries per label key in the AI input preview.
+const sampleValuesPerLabel = 5
 
 type scanOptions struct {
 	source    string
@@ -84,9 +91,10 @@ func runScan(cmd *cobra.Command, opts *scanOptions) error {
 	result := scan.Assemble(len(series), len(stats), invalids, contribs)
 
 	now := time.Now().UTC()
+	scanID := now.Format("20060102T150405Z") + "-scan"
 	rep := report.Report{
 		SchemaVersion: "v1",
-		ScanID:        now.Format("20060102T150405Z") + "-scan",
+		ScanID:        scanID,
 		ScanTime:      now.Format(time.RFC3339),
 		ToolVersion:   report.ToolVersion,
 		ConfigHash:    configHash,
@@ -109,7 +117,28 @@ func runScan(cmd *cobra.Command, opts *scanOptions) error {
 		return err
 	}
 
+	// Build the redacted AI input preview (separate artifact; never sent or
+	// stored with raw sensitive values).
+	analysesByName := make(map[string]model.MetricAnalysis, len(invalids))
+	for _, a := range invalids {
+		analysesByName[a.MetricName] = a
+	}
+	contexts := rules.Contexts(stats, inventory)
+	profiles := profile.Build(stats, analysesByName, contexts, sampleValuesPerLabel)
+	redactedProfiles, redaction := redact.Profiles(profiles)
+	preview := report.AIInputPreview{
+		SchemaVersion: "v1",
+		ScanID:        scanID,
+		Redaction:     redaction,
+		Profiles:      redactedProfiles,
+	}
+	previewPath := filepath.Join(opts.out, "ai_input_preview.json")
+	if err := report.WriteAIPreview(preview, previewPath); err != nil {
+		return err
+	}
+
 	report.PrintConsole(cmd.OutOrStdout(), rep)
 	fmt.Fprintf(cmd.OutOrStdout(), "  report:             %s\n", jsonPath)
+	fmt.Fprintf(cmd.OutOrStdout(), "  ai_input_preview:   %s (redacted_values=%d)\n", previewPath, redaction.RedactedValueCount)
 	return nil
 }

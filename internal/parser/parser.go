@@ -16,16 +16,15 @@ import (
 	"prom-ai-guard/internal/model"
 )
 
-// maxLineBytes bounds a single exposition line so the scanner can grow its
-// buffer beyond bufio's small default for high-cardinality label sets.
+// maxLineBytes bounds a single exposition line. A longer line is reported as a
+// warning and skipped; the scan continues with subsequent lines.
 const maxLineBytes = 1024 * 1024
 
 // ParseReader reads Prometheus text format and returns the parsed series plus a
 // warning for every line it could not parse. The error is non-nil only on an
-// I/O failure of the underlying reader, never on malformed content.
+// I/O failure of the underlying reader, never on malformed or oversized content.
 func ParseReader(r io.Reader) ([]model.MetricSeries, []model.ParseWarning, error) {
-	scanner := bufio.NewScanner(r)
-	scanner.Buffer(make([]byte, 0, 64*1024), maxLineBytes)
+	br := bufio.NewReaderSize(r, 64*1024)
 
 	var (
 		series []model.MetricSeries
@@ -33,24 +32,82 @@ func ParseReader(r io.Reader) ([]model.MetricSeries, []model.ParseWarning, error
 	)
 
 	lineNo := 0
-	for scanner.Scan() {
-		lineNo++
-		raw := scanner.Text()
-		trimmed := strings.TrimSpace(raw)
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
-			continue // blank line or HELP/TYPE/comment
+	for {
+		raw, tooLong, err := readBoundedLine(br, maxLineBytes)
+		if err != nil && err != io.EOF {
+			return series, warns, fmt.Errorf("reading metrics input: %w", err)
 		}
-		s, reason := parseLine(trimmed)
-		if reason != "" {
-			warns = append(warns, model.ParseWarning{Line: lineNo, Raw: raw, Reason: reason})
-			continue
+
+		// A line exists when we read bytes, hit the length cap, or terminated on
+		// a newline (err == nil) even with no bytes (a blank line).
+		if len(raw) > 0 || tooLong || err == nil {
+			lineNo++
+			if tooLong {
+				warns = append(warns, model.ParseWarning{
+					Line:   lineNo,
+					Raw:    previewRaw(raw),
+					Reason: fmt.Sprintf("line exceeds %d bytes, skipped", maxLineBytes),
+				})
+			} else {
+				trimmed := strings.TrimSpace(string(raw))
+				if trimmed != "" && !strings.HasPrefix(trimmed, "#") {
+					if s, reason := parseLine(trimmed); reason != "" {
+						warns = append(warns, model.ParseWarning{Line: lineNo, Raw: string(raw), Reason: reason})
+					} else {
+						series = append(series, s)
+					}
+				}
+			}
 		}
-		series = append(series, s)
-	}
-	if err := scanner.Err(); err != nil {
-		return series, warns, fmt.Errorf("reading metrics input: %w", err)
+
+		if err == io.EOF {
+			break
+		}
 	}
 	return series, warns, nil
+}
+
+// readBoundedLine reads one line (up to the next '\n') without loading more than
+// max bytes into memory. If the line is longer than max it sets tooLong, keeps
+// the first max bytes for the warning preview, and drains the rest so the next
+// call starts at the following line.
+func readBoundedLine(br *bufio.Reader, max int) (line []byte, tooLong bool, err error) {
+	var buf []byte
+	for {
+		frag, e := br.ReadSlice('\n')
+		if !tooLong {
+			if len(buf)+len(frag) > max {
+				if remain := max - len(buf); remain > 0 {
+					buf = append(buf, frag[:remain]...)
+				}
+				tooLong = true
+			} else {
+				buf = append(buf, frag...)
+			}
+		}
+		if e == bufio.ErrBufferFull {
+			continue // more of this line remains; keep reading/draining
+		}
+		return trimEOL(buf), tooLong, e
+	}
+}
+
+func trimEOL(b []byte) []byte {
+	if n := len(b); n > 0 && b[n-1] == '\n' {
+		b = b[:n-1]
+		if n2 := len(b); n2 > 0 && b[n2-1] == '\r' {
+			b = b[:n2-1]
+		}
+	}
+	return b
+}
+
+func previewRaw(b []byte) string {
+	const n = 80
+	if len(b) > n {
+		return string(b[:n]) + "...(truncated)"
+	}
+	return string(b)
 }
 
 // parseLine parses one already-trimmed, non-comment line. On success it returns
@@ -81,6 +138,11 @@ func parseLine(line string) (model.MetricSeries, string) {
 	valTok, ok := nextToken(line, &i)
 	if !ok {
 		return model.MetricSeries{}, "missing value"
+	}
+	// Reject Go-specific numeric syntax that Prometheus does not allow but
+	// strconv.ParseFloat would accept (underscore separators, hex floats).
+	if strings.ContainsAny(valTok, "_xX") {
+		return model.MetricSeries{}, fmt.Sprintf("invalid value %q", valTok)
 	}
 	value, err := strconv.ParseFloat(valTok, 64)
 	if err != nil {
@@ -153,6 +215,11 @@ func scanLabels(s string, i *int) (map[string]string, string) {
 		val, ok := scanQuoted(s, i)
 		if !ok {
 			return nil, "unterminated label value"
+		}
+		// Duplicate label names are malformed in Prometheus; reject rather than
+		// silently letting the last value win.
+		if _, exists := labels[key]; exists {
+			return nil, fmt.Sprintf("duplicate label name %q", key)
 		}
 		labels[key] = val
 		skipSpace(s, i)
