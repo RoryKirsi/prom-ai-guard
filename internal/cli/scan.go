@@ -13,6 +13,7 @@ import (
 	"prom-ai-guard/internal/model"
 	"prom-ai-guard/internal/parser"
 	"prom-ai-guard/internal/profile"
+	"prom-ai-guard/internal/promapi"
 	"prom-ai-guard/internal/redact"
 	"prom-ai-guard/internal/report"
 	"prom-ai-guard/internal/rules"
@@ -34,6 +35,15 @@ type scanOptions struct {
 	aiScope   string
 	model     string
 	baseURL   string
+
+	// prometheus_api source
+	promURL        string
+	match          []string
+	start          string
+	end            string
+	maxSeries      int
+	maxMetricNames int
+	promTimeout    int
 }
 
 func newScanCmd() *cobra.Command {
@@ -46,7 +56,7 @@ func newScanCmd() *cobra.Command {
 		},
 	}
 	f := cmd.Flags()
-	f.StringVar(&opts.source, "source", "file", "data source: file (prometheus_api in a later slice)")
+	f.StringVar(&opts.source, "source", "file", "data source: file or prometheus_api")
 	f.StringVar(&opts.input, "input", "", "path to a local Prometheus text metrics file (required for source=file)")
 	f.StringVar(&opts.out, "out", "reports", "directory for generated reports")
 	f.StringVar(&opts.config, "config", "configs", "directory holding rules.yaml, service_inventory.yaml, ai.yaml")
@@ -55,14 +65,22 @@ func newScanCmd() *cobra.Command {
 	f.StringVar(&opts.aiScope, "ai-scope", "all", "AI scope: all or invalid")
 	f.StringVar(&opts.model, "model", "", "LLM model, OpenAI-compatible (overrides ai.yaml)")
 	f.StringVar(&opts.baseURL, "base-url", "", "LLM base URL, OpenAI-compatible (overrides ai.yaml)")
+	// prometheus_api source (read-only; metadata-oriented; auth none in this version)
+	f.StringVar(&opts.promURL, "prom-url", "", "Prometheus base URL (required for source=prometheus_api; overrides prometheus.yaml)")
+	f.StringArrayVar(&opts.match, "match", nil, "optional Prometheus series matcher(s); presence makes scan_scope=filtered (repeatable)")
+	f.StringVar(&opts.start, "start", "", "optional start time passed to /api/v1/series")
+	f.StringVar(&opts.end, "end", "", "optional end time passed to /api/v1/series")
+	f.IntVar(&opts.maxSeries, "max-series", 100000, "guardrail: fail if fetched series exceed this (0 = unlimited)")
+	f.IntVar(&opts.maxMetricNames, "max-metric-names", 100000, "guardrail: fail if metric-name enumeration exceeds this (0 = unlimited)")
+	f.IntVar(&opts.promTimeout, "prom-timeout-seconds", 30, "HTTP timeout for Prometheus API requests")
 	return cmd
 }
 
 func runScan(cmd *cobra.Command, opts *scanOptions) error {
-	if opts.source != "file" {
-		return fmt.Errorf("source %q is not supported in this version; only %q is available", opts.source, "file")
+	if opts.source != "file" && opts.source != "prometheus_api" {
+		return fmt.Errorf("--source %q is invalid; allowed values are %q or %q", opts.source, "file", "prometheus_api")
 	}
-	if opts.input == "" {
+	if opts.source == "file" && opts.input == "" {
 		return fmt.Errorf("--input is required when --source=file")
 	}
 	if opts.scanScope != "all" && opts.scanScope != "filtered" {
@@ -101,15 +119,61 @@ func runScan(cmd *cobra.Command, opts *scanOptions) error {
 		aiCfg.BaseURL = opts.baseURL
 	}
 
-	f, err := os.Open(opts.input)
-	if err != nil {
-		return fmt.Errorf("opening input: %w", err)
-	}
-	defer f.Close()
+	// Acquire metric series from the selected source. On any source error we
+	// return before writing anything, so no partial report is produced.
+	var series []model.MetricSeries
+	var warns []model.ParseWarning
+	sourceScanScope := opts.scanScope
+	promURL := ""
 
-	series, warns, err := parser.ParseReader(f)
-	if err != nil {
-		return err
+	switch opts.source {
+	case "file":
+		f, oerr := os.Open(opts.input)
+		if oerr != nil {
+			return fmt.Errorf("opening input: %w", oerr)
+		}
+		defer f.Close()
+		series, warns, err = parser.ParseReader(f)
+		if err != nil {
+			return err
+		}
+	case "prometheus_api":
+		promCfg, perr := config.LoadPrometheus(filepath.Join(opts.config, "prometheus.yaml"))
+		if perr != nil {
+			return perr
+		}
+		promURL = promCfg.BaseURL
+		if opts.promURL != "" {
+			promURL = opts.promURL
+		}
+		if promURL == "" {
+			return fmt.Errorf("--prom-url (or base_url in prometheus.yaml) is required when --source=prometheus_api")
+		}
+		maxSeries := promCfg.MaxSeries
+		if cmd.Flags().Changed("max-series") {
+			maxSeries = opts.maxSeries
+		}
+		maxNames := promCfg.MaxMetricNames
+		if cmd.Flags().Changed("max-metric-names") {
+			maxNames = opts.maxMetricNames
+		}
+		timeoutSec := promCfg.TimeoutSeconds
+		if cmd.Flags().Changed("prom-timeout-seconds") {
+			timeoutSec = opts.promTimeout
+		}
+		client, cerr := promapi.NewClient(promURL, time.Duration(timeoutSec)*time.Second, maxSeries, maxNames, promCfg.BatchSize)
+		if cerr != nil {
+			return cerr
+		}
+		series, warns, err = client.FetchSeries(cmd.Context(), promapi.Options{Matchers: opts.match, Start: opts.start, End: opts.end})
+		if err != nil {
+			return err
+		}
+		// Derive scope from actual matchers, never imply filtering without them.
+		sourceScanScope = "all"
+		if len(opts.match) > 0 {
+			sourceScanScope = "filtered"
+		}
 	}
 
 	stats := tsdb.Build(series)
@@ -164,7 +228,8 @@ func runScan(cmd *cobra.Command, opts *scanOptions) error {
 		Source: report.Source{
 			SourceType:      opts.source,
 			InputRef:        opts.input,
-			ScanScope:       opts.scanScope,
+			PromURL:         promURL,
+			ScanScope:       sourceScanScope,
 			SeriesCount:     result.Summary.TotalSeries,
 			MetricNameCount: result.Summary.TotalMetricNames,
 		},

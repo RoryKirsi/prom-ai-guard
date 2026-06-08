@@ -1,0 +1,9 @@
+# Read-only Prometheus HTTP API data source (used when --source prometheus_api).
+# The API mode is metadata-oriented: /api/v1/series returns label sets but no
+# sample values, so series values are 0 placeholders. Authentication is none in
+# this version. base_url may also be supplied via --prom-url (flag overrides).
+base_url: ""
+timeout_seconds: 30
+max_series: 100000        # 0 = unlimited (opt-out); exceeding it fails with exit 1
+max_metric_names: 100000  # guard on /label/__name__/values enumeration
+batch_size: 50            # metric names per batched POST /api/v1/series request

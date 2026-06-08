@@ -12,7 +12,11 @@ func PrintConsole(w io.Writer, r Report) {
 	s := r.Summary
 	fmt.Fprintln(w, "prom-ai-guard scan")
 	fmt.Fprintf(w, "  scan_id:            %s\n", r.ScanID)
-	fmt.Fprintf(w, "  source:             %s (%s)\n", r.Source.SourceType, r.Source.InputRef)
+	if r.Source.SourceType == "prometheus_api" {
+		fmt.Fprintf(w, "  source:             prometheus_api %s (metadata-oriented; series values are 0 placeholders)\n", r.Source.PromURL)
+	} else {
+		fmt.Fprintf(w, "  source:             %s (%s)\n", r.Source.SourceType, r.Source.InputRef)
+	}
 	fmt.Fprintf(w, "  total_series:       %d\n", s.TotalSeries)
 	fmt.Fprintf(w, "  total_metric_names: %d\n", s.TotalMetricNames)
 	fmt.Fprintf(w, "  valid / invalid:    %d / %d (ratio %.4f)\n", s.ValidMetricNames, s.InvalidMetricNames, s.InvalidRatio)
