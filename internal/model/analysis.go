@@ -22,7 +22,9 @@ type MetricAnalysis struct {
 	RelabelCandidate bool           `json:"relabel_candidate"`
 	// Slice 4 additive fields. RiskReason is the AI's risk justification (kept
 	// distinct from root_cause). AnalysisSources records which layers produced
-	// this finding: ["local_rules"], ["deepseek"], or both.
+	// this finding using provider-neutral tags: ["local_rules"], ["llm"], or
+	// both. Provider-specific details (e.g. the configured LLM provider) are
+	// recorded in the top-level ai.provider field, not here.
 	RiskReason      string   `json:"risk_reason,omitempty"`
 	AnalysisSources []string `json:"analysis_sources,omitempty"`
 }
