@@ -1,0 +1,11 @@
+# Slice 5.5 AI-only identification demo.
+#
+# Locally valid (clean name, clean labels, service known to the inventory) but
+# semantically inconsistent: the name says the metric is a duration in seconds,
+# while the label unit="bytes" contradicts that. Deterministic local rules cannot
+# understand this contradiction, so only the LLM flags it (meaningless_metric).
+http_request_duration_seconds{unit="bytes",service="payment-api"} 12
+# Locally severe: forbidden high-cardinality label user_id. The LLM must NOT be
+# able to downgrade this rule finding.
+http_user_requests_total{user_id="u1",service="payment-api"} 1
+http_user_requests_total{user_id="u2",service="payment-api"} 1
