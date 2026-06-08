@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/xuri/excelize/v2"
+
+	"prom-ai-guard/internal/model"
 )
 
 // Sheet names (exact, including spaces).
@@ -17,6 +19,7 @@ const (
 	sheetTopRisk      = "Top Risk"
 	sheetTopViolation = "Top Violation Labels"
 	sheetWarnings     = "Warnings"
+	sheetStorage      = "Storage Impact"
 )
 
 // xlStyles holds the reusable cell styles (header + per-risk fills).
@@ -40,7 +43,7 @@ func WriteExcel(r Report, path string) error {
 	if err := f.SetSheetName("Sheet1", sheetSummary); err != nil {
 		return fmt.Errorf("excel sheet init: %w", err)
 	}
-	for _, name := range []string{sheetInvalid, sheetTopRisk, sheetTopViolation, sheetWarnings} {
+	for _, name := range []string{sheetInvalid, sheetTopRisk, sheetTopViolation, sheetWarnings, sheetStorage} {
 		if _, err := f.NewSheet(name); err != nil {
 			return fmt.Errorf("excel new sheet %q: %w", name, err)
 		}
@@ -60,6 +63,9 @@ func WriteExcel(r Report, path string) error {
 		return err
 	}
 	if err := writeWarningsSheet(f, styles, r); err != nil {
+		return err
+	}
+	if err := writeStorageSheet(f, styles, r); err != nil {
 		return err
 	}
 
@@ -219,6 +225,42 @@ func writeTopViolationSheet(f *excelize.File, st xlStyles, r Report) error {
 		applyRisk(f, st, sheetTopViolation, 3, row, v.RiskLevel)
 	}
 	return nil
+}
+
+// writeStorageSheet writes the deterministic TSDB-index storage-impact
+// simulation. estimated_index_entries is heuristic, not real TSDB bytes.
+func writeStorageSheet(f *excelize.File, st xlStyles, r Report) error {
+	cols := []string{"metric_name", "series_count", "label_count", "max_label_cardinality",
+		"top_cardinality_labels", "estimated_index_entries", "impact_level", "reason"}
+	widths := []float64{30, 14, 12, 22, 30, 24, 14, 44}
+	if err := header(f, sheetStorage, cols, widths, st); err != nil {
+		return err
+	}
+	row := 2
+	for _, m := range r.InvalidMetrics {
+		s := m.StorageImpact
+		if s == nil {
+			continue
+		}
+		_ = f.SetCellValue(sheetStorage, cell(1, row), m.MetricName)
+		_ = f.SetCellValue(sheetStorage, cell(2, row), s.SeriesCount)
+		_ = f.SetCellValue(sheetStorage, cell(3, row), s.LabelCount)
+		_ = f.SetCellValue(sheetStorage, cell(4, row), s.MaxLabelCardinality)
+		_ = f.SetCellValue(sheetStorage, cell(5, row), topLabelsString(s.TopCardinalityLabels))
+		_ = f.SetCellValue(sheetStorage, cell(6, row), s.EstimatedIndexEntries)
+		_ = f.SetCellValue(sheetStorage, cell(7, row), s.ImpactLevel)
+		_ = f.SetCellValue(sheetStorage, cell(8, row), s.Reason)
+		row++
+	}
+	return nil
+}
+
+func topLabelsString(refs []model.LabelCardinalityRef) string {
+	parts := make([]string, 0, len(refs))
+	for _, r := range refs {
+		parts = append(parts, fmt.Sprintf("%s=%d", r.LabelKey, r.Cardinality))
+	}
+	return strings.Join(parts, ", ")
 }
 
 func writeWarningsSheet(f *excelize.File, st xlStyles, r Report) error {

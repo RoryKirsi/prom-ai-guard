@@ -18,6 +18,7 @@ import (
 	"prom-ai-guard/internal/report"
 	"prom-ai-guard/internal/rules"
 	"prom-ai-guard/internal/scan"
+	"prom-ai-guard/internal/storage"
 	"prom-ai-guard/internal/tsdb"
 )
 
@@ -217,6 +218,16 @@ func runScan(cmd *cobra.Command, opts *scanOptions) error {
 	aiResult := analyzer.Run(cmd.Context(), scanID, redactedProfiles, invalids)
 
 	result := scan.Assemble(len(series), len(stats), aiResult.Invalids, contribs)
+
+	// Slice 12: deterministic TSDB-index storage-impact simulation over the
+	// invalid metrics (mutates them in place; nests the aggregate under summary).
+	storageSummary := storage.Annotate(result.InvalidMetrics, storage.Thresholds{
+		HighIndexEntries:       rulesCfg.StorageImpact.HighIndexEntries,
+		MediumIndexEntries:     rulesCfg.StorageImpact.MediumIndexEntries,
+		HighLabelCardinality:   rulesCfg.StorageImpact.HighLabelCardinality,
+		MediumLabelCardinality: rulesCfg.StorageImpact.MediumLabelCardinality,
+	})
+	result.Summary.StorageImpact = &storageSummary
 
 	aiInfo := aiResult.Info
 	rep := report.Report{

@@ -28,6 +28,11 @@ func PrintConsole(w io.Writer, r Report) {
 		fmt.Fprintf(w, "    - %-20s %d\n", t, s.InvalidTypeCounts[t])
 	}
 
+	if si := s.StorageImpact; si != nil {
+		fmt.Fprintf(w, "  storage_impact:     high=%d medium=%d low=%d est_invalid_index_entries=%d (heuristic)\n",
+			si.HighImpactMetrics, si.MediumImpactMetrics, si.LowImpactMetrics, si.EstimatedInvalidIndexEntries)
+	}
+
 	if r.AI != nil {
 		fmt.Fprintf(w, "  ai:                 %s (mode=%s model=%s analyzed=%d)\n",
 			r.AI.Status, r.AI.AIMode, r.AI.Model, r.AI.AnalyzedMetricCount)

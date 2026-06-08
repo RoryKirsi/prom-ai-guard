@@ -19,3 +19,14 @@ patterns:
     - request_id
     - password
     - token
+# Slice 12 TSDB-index storage-impact simulation thresholds. These are
+# FIRST-VERSION / DEMO-FRIENDLY defaults (intentionally low so small fixtures show
+# high/medium/low). RAISE THEM for production-scale Prometheus. estimated_index_entries
+# = series_count*(label_count+1) + sum(label_cardinality) is a heuristic proxy for
+# inverted-index postings, NOT real TSDB bytes. Omit this block to use the same
+# built-in defaults.
+storage_impact:
+  high_index_entries: 200
+  medium_index_entries: 50
+  high_label_cardinality: 20
+  medium_label_cardinality: 5

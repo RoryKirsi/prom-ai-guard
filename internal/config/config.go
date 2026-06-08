@@ -24,6 +24,19 @@ type Rules struct {
 		DebugMetricNames      []string `yaml:"debug_metric_names"`
 		ForbiddenLabelKeys    []string `yaml:"forbidden_label_keys"`
 	} `yaml:"patterns"`
+	// StorageImpact thresholds for the Slice 12 TSDB-index simulation. Optional;
+	// zero/absent fields fall back to demo-scaled defaults in internal/storage.
+	// Those defaults are intentionally low for first-version/demo visibility and
+	// should be raised for production-scale Prometheus.
+	StorageImpact StorageImpactThresholds `yaml:"storage_impact"`
+}
+
+// StorageImpactThresholds tunes the storage-impact impact_level classification.
+type StorageImpactThresholds struct {
+	HighIndexEntries       int `yaml:"high_index_entries"`
+	MediumIndexEntries     int `yaml:"medium_index_entries"`
+	HighLabelCardinality   int `yaml:"high_label_cardinality"`
+	MediumLabelCardinality int `yaml:"medium_label_cardinality"`
 }
 
 // Service is one entry in service_inventory.yaml.

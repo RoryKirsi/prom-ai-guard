@@ -115,6 +115,9 @@ func RenderMarkdown(r Report) string {
 		}
 	}
 
+	// Storage impact (heuristic)
+	renderStorageImpact(&b, r)
+
 	// Parse warnings
 	b.WriteString("## Parse warnings\n\n")
 	if len(r.Warnings) == 0 {
@@ -155,6 +158,38 @@ func renderInvalidMetric(b *strings.Builder, m model.MetricAnalysis) {
 		fmt.Fprintf(b, "- analysis_sources: %s\n", strings.Join(m.AnalysisSources, ", "))
 	}
 	fmt.Fprintf(b, "- relabel_candidate: %t\n\n", m.RelabelCandidate)
+}
+
+// renderStorageImpact renders the deterministic TSDB-index storage-impact
+// simulation. estimated_index_entries is heuristic, not real TSDB bytes.
+func renderStorageImpact(b *strings.Builder, r Report) {
+	b.WriteString("## Storage impact (heuristic)\n\n")
+	si := r.Summary.StorageImpact
+	if si == nil {
+		b.WriteString("_none_\n\n")
+		return
+	}
+	fmt.Fprintf(b, "- impact metrics: high=%d medium=%d low=%d\n", si.HighImpactMetrics, si.MediumImpactMetrics, si.LowImpactMetrics)
+	fmt.Fprintf(b, "- estimated_invalid_series: %d\n", si.EstimatedInvalidSeries)
+	fmt.Fprintf(b, "- estimated_invalid_index_entries: %d\n", si.EstimatedInvalidIndexEntries)
+	fmt.Fprintf(b, "\n> Note: %s\n", si.Heuristic)
+	fmt.Fprintf(b, "> Scope: %s\n\n", si.ScopeNote)
+
+	if len(r.InvalidMetrics) == 0 {
+		b.WriteString("_no invalid metrics_\n\n")
+		return
+	}
+	b.WriteString("| metric_name | series_count | label_count | max_label_cardinality | estimated_index_entries | impact_level |\n")
+	b.WriteString("|---|---|---|---|---|---|\n")
+	for _, m := range r.InvalidMetrics {
+		s := m.StorageImpact
+		if s == nil {
+			continue
+		}
+		fmt.Fprintf(b, "| %s | %d | %d | %d | %d | %s |\n",
+			m.MetricName, s.SeriesCount, s.LabelCount, s.MaxLabelCardinality, s.EstimatedIndexEntries, s.ImpactLevel)
+	}
+	b.WriteString("\n")
 }
 
 // WriteMarkdown renders and writes the Markdown report to path.

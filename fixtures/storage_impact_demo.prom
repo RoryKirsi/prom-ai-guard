@@ -1,0 +1,41 @@
+# Slice 12 storage-impact demo. With the demo-scaled default thresholds
+# (high_label_cardinality=20, medium=5), these three metrics show high/medium/low
+# storage impact without a large file. user_id is a forbidden label (high_cardinality).
+# high impact: 25 distinct user_id values (max_label_cardinality=25 >= 20)
+http_user_requests_total{service="payment-api",user_id="u1"} 1
+http_user_requests_total{service="payment-api",user_id="u2"} 1
+http_user_requests_total{service="payment-api",user_id="u3"} 1
+http_user_requests_total{service="payment-api",user_id="u4"} 1
+http_user_requests_total{service="payment-api",user_id="u5"} 1
+http_user_requests_total{service="payment-api",user_id="u6"} 1
+http_user_requests_total{service="payment-api",user_id="u7"} 1
+http_user_requests_total{service="payment-api",user_id="u8"} 1
+http_user_requests_total{service="payment-api",user_id="u9"} 1
+http_user_requests_total{service="payment-api",user_id="u10"} 1
+http_user_requests_total{service="payment-api",user_id="u11"} 1
+http_user_requests_total{service="payment-api",user_id="u12"} 1
+http_user_requests_total{service="payment-api",user_id="u13"} 1
+http_user_requests_total{service="payment-api",user_id="u14"} 1
+http_user_requests_total{service="payment-api",user_id="u15"} 1
+http_user_requests_total{service="payment-api",user_id="u16"} 1
+http_user_requests_total{service="payment-api",user_id="u17"} 1
+http_user_requests_total{service="payment-api",user_id="u18"} 1
+http_user_requests_total{service="payment-api",user_id="u19"} 1
+http_user_requests_total{service="payment-api",user_id="u20"} 1
+http_user_requests_total{service="payment-api",user_id="u21"} 1
+http_user_requests_total{service="payment-api",user_id="u22"} 1
+http_user_requests_total{service="payment-api",user_id="u23"} 1
+http_user_requests_total{service="payment-api",user_id="u24"} 1
+http_user_requests_total{service="payment-api",user_id="u25"} 1
+# medium impact: 8 distinct user_id values (>= 5)
+cart_user_events_total{service="payment-api",user_id="c1"} 1
+cart_user_events_total{service="payment-api",user_id="c2"} 1
+cart_user_events_total{service="payment-api",user_id="c3"} 1
+cart_user_events_total{service="payment-api",user_id="c4"} 1
+cart_user_events_total{service="payment-api",user_id="c5"} 1
+cart_user_events_total{service="payment-api",user_id="c6"} 1
+cart_user_events_total{service="payment-api",user_id="c7"} 1
+cart_user_events_total{service="payment-api",user_id="c8"} 1
+# low impact: a deprecated metric with 2 series (max cardinality 2)
+order_legacy_latency_seconds{service="payment-api",region="eu"} 1
+order_legacy_latency_seconds{service="payment-api",region="us"} 1

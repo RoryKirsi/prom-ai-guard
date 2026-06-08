@@ -36,6 +36,13 @@ func sampleReport() Report {
 				"deprecated_metric": 1, "duplicate_metric": 1, "empty_label_value": 1,
 				"invalid_label_name": 1, "meaningless_metric": 1, "orphan_metric": 1, "high_cardinality": 1,
 			},
+			StorageImpact: &model.StorageImpactSummary{
+				HighImpactMetrics: 1, MediumImpactMetrics: 0, LowImpactMetrics: 6,
+				EstimatedInvalidSeries: 16, EstimatedInvalidIndexEntries: 120,
+				TopStorageImpactMetrics: []model.StorageImpactRef{{MetricName: "http_user_requests_total", EstimatedIndexEntries: 13, ImpactLevel: "high"}},
+				Heuristic:               "estimated_index_entries is a heuristic proxy for inverted-index postings, not real TSDB bytes; no disk-size guarantee.",
+				ScopeNote:               "computed for invalid metrics only.",
+			},
 		},
 		InvalidMetrics: []model.MetricAnalysis{{
 			MetricName: "http_user_requests_total", IsInvalid: true,
@@ -46,6 +53,11 @@ func sampleReport() Report {
 			Owner:           "platform", Service: "payment-api", Namespace: "payments",
 			SeriesCount: 3, LabelCardinality: map[string]int{"user_id": 3, "service": 1},
 			RelabelCandidate: true, AnalysisSources: []string{"local_rules", "llm"},
+			StorageImpact: &model.StorageImpact{
+				SeriesCount: 3, LabelCount: 2, MaxLabelCardinality: 3,
+				TopCardinalityLabels:  []model.LabelCardinalityRef{{LabelKey: "user_id", Cardinality: 3}, {LabelKey: "service", Cardinality: 1}},
+				EstimatedIndexEntries: 13, ImpactLevel: "high", Reason: "high-cardinality label \"user_id\" (3 distinct values)",
+			},
 		}},
 		TopRiskMetrics: []model.RiskRef{{
 			MetricName: "http_user_requests_total", RiskLevel: "severe", RiskScore: 90,
@@ -72,11 +84,26 @@ func TestRenderMarkdownHasRequiredSections(t *testing.T) {
 		"## Top risk metrics",
 		"## Top violation labels",
 		"## Invalid metric details",
+		"## Storage impact (heuristic)",
 		"## Parse warnings",
 		"## Report files",
 	} {
 		if !strings.Contains(md, want) {
 			t.Errorf("markdown missing section %q", want)
+		}
+	}
+}
+
+func TestRenderMarkdownStorageSection(t *testing.T) {
+	md := RenderMarkdown(sampleReport())
+	for _, want := range []string{
+		"high=1 medium=0 low=6",
+		"estimated_invalid_index_entries: 120",
+		"heuristic proxy for inverted-index postings, not real TSDB bytes",
+		"| http_user_requests_total | 3 | 2 | 3 | 13 | high |",
+	} {
+		if !strings.Contains(md, want) {
+			t.Errorf("storage section missing %q", want)
 		}
 	}
 }

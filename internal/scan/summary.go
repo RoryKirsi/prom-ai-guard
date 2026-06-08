@@ -21,6 +21,9 @@ type Summary struct {
 	InvalidRatio       float64        `json:"invalid_ratio"`
 	RiskDistribution   map[string]int `json:"risk_distribution"`
 	InvalidTypeCounts  map[string]int `json:"invalid_type_counts"`
+	// Slice 12 additive: aggregate TSDB-index storage-impact simulation. Nested
+	// here (summary.storage_impact) rather than a new top-level report key.
+	StorageImpact *model.StorageImpactSummary `json:"storage_impact,omitempty"`
 }
 
 // Result bundles everything the rule pass produces for the report.

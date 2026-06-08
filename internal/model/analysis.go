@@ -27,6 +27,48 @@ type MetricAnalysis struct {
 	// recorded in the top-level ai.provider field, not here.
 	RiskReason      string   `json:"risk_reason,omitempty"`
 	AnalysisSources []string `json:"analysis_sources,omitempty"`
+	// Slice 12 additive field: deterministic TSDB-index storage-impact simulation
+	// for this invalid metric. Heuristic, not real TSDB bytes.
+	StorageImpact *StorageImpact `json:"storage_impact,omitempty"`
+}
+
+// LabelCardinalityRef is one (label_key, cardinality) entry.
+type LabelCardinalityRef struct {
+	LabelKey    string `json:"label_key"`
+	Cardinality int    `json:"cardinality"`
+}
+
+// StorageImpact is the per-metric TSDB-index storage-impact simulation. It is a
+// deterministic heuristic computed from series_count + label_cardinality; it does
+// NOT read real Prometheus TSDB blocks/WAL/chunks and is not byte accounting.
+type StorageImpact struct {
+	SeriesCount           int                   `json:"series_count"`
+	LabelCount            int                   `json:"label_count"`
+	MaxLabelCardinality   int                   `json:"max_label_cardinality"`
+	TopCardinalityLabels  []LabelCardinalityRef `json:"top_cardinality_labels"`
+	EstimatedIndexEntries int                   `json:"estimated_index_entries"`
+	ImpactLevel           string                `json:"impact_level"`
+	Reason                string                `json:"reason"`
+}
+
+// StorageImpactRef is a slim entry for the summary's top list.
+type StorageImpactRef struct {
+	MetricName            string `json:"metric_name"`
+	EstimatedIndexEntries int    `json:"estimated_index_entries"`
+	ImpactLevel           string `json:"impact_level"`
+}
+
+// StorageImpactSummary aggregates storage impact across the invalid metrics. It
+// lives under summary.storage_impact (not a top-level report key).
+type StorageImpactSummary struct {
+	HighImpactMetrics            int                `json:"high_impact_metrics"`
+	MediumImpactMetrics          int                `json:"medium_impact_metrics"`
+	LowImpactMetrics             int                `json:"low_impact_metrics"`
+	EstimatedInvalidSeries       int                `json:"estimated_invalid_series"`
+	EstimatedInvalidIndexEntries int                `json:"estimated_invalid_index_entries"`
+	TopStorageImpactMetrics      []StorageImpactRef `json:"top_storage_impact_metrics"`
+	Heuristic                    string             `json:"heuristic"`
+	ScopeNote                    string             `json:"scope_note"`
 }
 
 // RiskRef is a slim entry for the top_risk_metrics list.
