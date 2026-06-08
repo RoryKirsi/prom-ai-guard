@@ -20,6 +20,11 @@ type MetricAnalysis struct {
 	SeriesCount      int            `json:"series_count"`
 	LabelCardinality map[string]int `json:"label_cardinality"`
 	RelabelCandidate bool           `json:"relabel_candidate"`
+	// Slice 4 additive fields. RiskReason is the AI's risk justification (kept
+	// distinct from root_cause). AnalysisSources records which layers produced
+	// this finding: ["local_rules"], ["deepseek"], or both.
+	RiskReason      string   `json:"risk_reason,omitempty"`
+	AnalysisSources []string `json:"analysis_sources,omitempty"`
 }
 
 // RiskRef is a slim entry for the top_risk_metrics list.

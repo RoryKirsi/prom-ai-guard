@@ -8,6 +8,7 @@
 package report
 
 import (
+	"prom-ai-guard/internal/ai"
 	"prom-ai-guard/internal/model"
 	"prom-ai-guard/internal/scan"
 )
@@ -34,6 +35,7 @@ type Report struct {
 	ToolVersion        string                 `json:"tool_version"`
 	ConfigHash         string                 `json:"config_hash"`
 	Source             Source                 `json:"source"`
+	AI                 *ai.Info               `json:"ai,omitempty"`
 	Summary            scan.Summary           `json:"summary"`
 	InvalidMetrics     []model.MetricAnalysis `json:"invalid_metrics"`
 	TopRiskMetrics     []model.RiskRef        `json:"top_risk_metrics"`

@@ -160,7 +160,7 @@ func evaluateMetric(st *tsdb.MetricStat, cfg config.Rules, deprecated, debug []*
 		return a, nil
 	}
 
-	score := riskScore(types)
+	score := RiskScore(types)
 	a.IsInvalid = true
 	a.InvalidTypes = types
 	a.RuleSignals = signals
@@ -177,8 +177,10 @@ func evaluateMetric(st *tsdb.MetricStat, cfg config.Rules, deprecated, debug []*
 	return a, contribs
 }
 
-// riskScore = max(base) + 5*(extraTypes), clamped to [0,100].
-func riskScore(types []string) int {
+// RiskScore = max(base) + 5*(extraTypes), clamped to [0,100]. Exported so the
+// AI analyzer can deterministically re-score the union of rule + AI invalid
+// types (rule types are always a subset, so the score can only rise).
+func RiskScore(types []string) int {
 	maxBase := 0
 	for _, t := range types {
 		if baseScore[t] > maxBase {
@@ -208,6 +210,13 @@ func RiskLevelFor(score int) string {
 }
 
 func isRelabelCandidate(types []string) bool {
+	return IsRelabelCandidate(types)
+}
+
+// IsRelabelCandidate reports whether any of the invalid types can be remediated
+// by a metric_relabel drop/labeldrop rule. Exported so the AI analyzer can
+// recompute relabel_candidate after merging rule + AI invalid types.
+func IsRelabelCandidate(types []string) bool {
 	for _, t := range types {
 		if relabelCandidateTypes[t] {
 			return true

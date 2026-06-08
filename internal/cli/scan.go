@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"prom-ai-guard/internal/ai"
 	"prom-ai-guard/internal/config"
 	"prom-ai-guard/internal/model"
 	"prom-ai-guard/internal/parser"
@@ -29,6 +30,10 @@ type scanOptions struct {
 	out       string
 	config    string
 	scanScope string
+	aiMode    string
+	aiScope   string
+	model     string
+	baseURL   string
 }
 
 func newScanCmd() *cobra.Command {
@@ -44,8 +49,12 @@ func newScanCmd() *cobra.Command {
 	f.StringVar(&opts.source, "source", "file", "data source: file (prometheus_api in a later slice)")
 	f.StringVar(&opts.input, "input", "", "path to a local Prometheus text metrics file (required for source=file)")
 	f.StringVar(&opts.out, "out", "reports", "directory for generated reports")
-	f.StringVar(&opts.config, "config", "configs", "directory holding rules.yaml and service_inventory.yaml")
+	f.StringVar(&opts.config, "config", "configs", "directory holding rules.yaml, service_inventory.yaml, ai.yaml")
 	f.StringVar(&opts.scanScope, "scan-scope", "all", "scan scope: all or filtered")
+	f.StringVar(&opts.aiMode, "ai-mode", "deepseek_fullscan", "AI mode: deepseek_fullscan or local_rules")
+	f.StringVar(&opts.aiScope, "ai-scope", "all", "AI scope: all or invalid")
+	f.StringVar(&opts.model, "model", "", "LLM model, OpenAI-compatible (overrides ai.yaml)")
+	f.StringVar(&opts.baseURL, "base-url", "", "LLM base URL, OpenAI-compatible (overrides ai.yaml)")
 	return cmd
 }
 
@@ -59,6 +68,12 @@ func runScan(cmd *cobra.Command, opts *scanOptions) error {
 	if opts.scanScope != "all" && opts.scanScope != "filtered" {
 		return fmt.Errorf("--scan-scope %q is invalid; allowed values are %q or %q", opts.scanScope, "all", "filtered")
 	}
+	if opts.aiMode != ai.ModeDeepSeekFullScan && opts.aiMode != ai.ModeLocalRules {
+		return fmt.Errorf("--ai-mode %q is not supported; allowed values are %q or %q", opts.aiMode, ai.ModeDeepSeekFullScan, ai.ModeLocalRules)
+	}
+	if opts.aiScope != ai.ScopeAll && opts.aiScope != ai.ScopeInvalid {
+		return fmt.Errorf("--ai-scope %q is invalid; allowed values are %q or %q", opts.aiScope, ai.ScopeAll, ai.ScopeInvalid)
+	}
 
 	rulesPath := filepath.Join(opts.config, "rules.yaml")
 	invPath := filepath.Join(opts.config, "service_inventory.yaml")
@@ -70,9 +85,20 @@ func runScan(cmd *cobra.Command, opts *scanOptions) error {
 	if err != nil {
 		return err
 	}
+	// Top-level config_hash stays rules.yaml + service_inventory.yaml only.
 	configHash, err := config.HashFiles(rulesPath, invPath)
 	if err != nil {
 		return err
+	}
+	aiCfg, err := config.LoadAI(filepath.Join(opts.config, "ai.yaml"))
+	if err != nil {
+		return err
+	}
+	if opts.model != "" {
+		aiCfg.Model = opts.model
+	}
+	if opts.baseURL != "" {
+		aiCfg.BaseURL = opts.baseURL
 	}
 
 	f, err := os.Open(opts.input)
@@ -88,10 +114,46 @@ func runScan(cmd *cobra.Command, opts *scanOptions) error {
 
 	stats := tsdb.Build(series)
 	invalids, contribs := rules.Evaluate(stats, rulesCfg, inventory)
-	result := scan.Assemble(len(series), len(stats), invalids, contribs)
+	contexts := rules.Contexts(stats, inventory)
+
+	analysesByName := make(map[string]model.MetricAnalysis, len(invalids))
+	for _, a := range invalids {
+		analysesByName[a.MetricName] = a
+	}
+	profiles := profile.Build(stats, analysesByName, contexts, sampleValuesPerLabel)
+	redactedProfiles, redaction := redact.Profiles(profiles)
 
 	now := time.Now().UTC()
 	scanID := now.Format("20060102T150405Z") + "-scan"
+
+	// AI analysis over the redacted profiles. Merged invalids drive the report.
+	apiKey := os.Getenv(aiCfg.APIKeyEnv)
+	var completer ai.Completer
+	if opts.aiMode == ai.ModeDeepSeekFullScan {
+		client, cerr := ai.NewClient(aiCfg.BaseURL, aiCfg.Model, apiKey, time.Duration(aiCfg.TimeoutSeconds)*time.Second)
+		if cerr != nil {
+			return fmt.Errorf("ai client configuration: %w", cerr)
+		}
+		completer = client
+	}
+	analyzer := ai.Analyzer{
+		Provider:         aiCfg.Provider,
+		Model:            aiCfg.Model,
+		BaseURL:          aiCfg.BaseURL,
+		Mode:             opts.aiMode,
+		Scope:            opts.aiScope,
+		MaxAttempts:      aiCfg.MaxAttempts,
+		MaxPayloadBytes:  aiCfg.MaxPayloadBytes,
+		ConfigHash:       aiCfg.SanitizedHash(),
+		RedactionEnabled: true,
+		KeyPresent:       apiKey != "",
+		Completer:        completer,
+	}
+	aiResult := analyzer.Run(cmd.Context(), scanID, redactedProfiles, invalids)
+
+	result := scan.Assemble(len(series), len(stats), aiResult.Invalids, contribs)
+
+	aiInfo := aiResult.Info
 	rep := report.Report{
 		SchemaVersion: "v1",
 		ScanID:        scanID,
@@ -105,6 +167,7 @@ func runScan(cmd *cobra.Command, opts *scanOptions) error {
 			SeriesCount:     result.Summary.TotalSeries,
 			MetricNameCount: result.Summary.TotalMetricNames,
 		},
+		AI:                 &aiInfo,
 		Summary:            result.Summary,
 		InvalidMetrics:     result.InvalidMetrics,
 		TopRiskMetrics:     result.TopRiskMetrics,
@@ -117,15 +180,7 @@ func runScan(cmd *cobra.Command, opts *scanOptions) error {
 		return err
 	}
 
-	// Build the redacted AI input preview (separate artifact; never sent or
-	// stored with raw sensitive values).
-	analysesByName := make(map[string]model.MetricAnalysis, len(invalids))
-	for _, a := range invalids {
-		analysesByName[a.MetricName] = a
-	}
-	contexts := rules.Contexts(stats, inventory)
-	profiles := profile.Build(stats, analysesByName, contexts, sampleValuesPerLabel)
-	redactedProfiles, redaction := redact.Profiles(profiles)
+	// Redacted AI input preview (separate artifact; never raw sensitive values).
 	preview := report.AIInputPreview{
 		SchemaVersion: "v1",
 		ScanID:        scanID,

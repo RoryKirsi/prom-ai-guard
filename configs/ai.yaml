@@ -1,0 +1,13 @@
+# OpenAI-compatible Chat Completions configuration. Any provider that exposes
+# the OpenAI /v1/chat/completions API works (DeepSeek is the default demo
+# provider). Swap provider/model/base_url/api_key_env for another provider.
+# The API key is read from the environment variable named by api_key_env and is
+# never stored in this file.
+provider: deepseek
+mode: deepseek_fullscan
+model: deepseek-v4-flash
+base_url: https://api.deepseek.com
+api_key_env: DEEPSEEK_API_KEY
+max_attempts: 2
+max_payload_bytes: 262144
+timeout_seconds: 30

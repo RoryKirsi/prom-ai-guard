@@ -24,6 +24,14 @@ func PrintConsole(w io.Writer, r Report) {
 		fmt.Fprintf(w, "    - %-20s %d\n", t, s.InvalidTypeCounts[t])
 	}
 
+	if r.AI != nil {
+		fmt.Fprintf(w, "  ai:                 %s (mode=%s model=%s analyzed=%d)\n",
+			r.AI.Status, r.AI.AIMode, r.AI.Model, r.AI.AnalyzedMetricCount)
+		if r.AI.FallbackReason != "" {
+			fmt.Fprintf(w, "    fallback_reason:  %s\n", r.AI.FallbackReason)
+		}
+	}
+
 	fmt.Fprintf(w, "  parse_warnings:     %d\n", len(r.Warnings))
 	for _, warn := range r.Warnings {
 		fmt.Fprintf(w, "    - line %d: %s\n", warn.Line, warn.Reason)
