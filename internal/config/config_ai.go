@@ -23,6 +23,9 @@ type AIConfig struct {
 	MaxAttempts     int    `yaml:"max_attempts"`
 	MaxPayloadBytes int    `yaml:"max_payload_bytes"`
 	TimeoutSeconds  int    `yaml:"timeout_seconds"`
+	// BatchSize splits the redacted MetricProfiles into per-request LLM batches in
+	// llm_fullscan mode (controls JSON payload size + profile count). 0 -> default.
+	BatchSize int `yaml:"batch_size"`
 }
 
 // DefaultAIConfig returns the built-in defaults used when configs/ai.yaml is
@@ -37,6 +40,7 @@ func DefaultAIConfig() AIConfig {
 		MaxAttempts:     2,
 		MaxPayloadBytes: 262144,
 		TimeoutSeconds:  30,
+		BatchSize:       50,
 	}
 }
 
@@ -83,6 +87,9 @@ func applyAIDefaults(cfg AIConfig) AIConfig {
 	if cfg.TimeoutSeconds <= 0 {
 		cfg.TimeoutSeconds = d.TimeoutSeconds
 	}
+	if cfg.BatchSize <= 0 {
+		cfg.BatchSize = d.BatchSize
+	}
 	return cfg
 }
 
@@ -90,8 +97,8 @@ func applyAIDefaults(cfg AIConfig) AIConfig {
 // It deliberately excludes api_key_env and never touches environment values, so
 // the resulting ai.config_hash carries no secret material.
 func (c AIConfig) SanitizedHash() string {
-	canonical := fmt.Sprintf("provider=%s\nmode=%s\nmodel=%s\nbase_url=%s\nmax_attempts=%d\nmax_payload_bytes=%d\ntimeout_seconds=%d\n",
-		c.Provider, c.Mode, c.Model, c.BaseURL, c.MaxAttempts, c.MaxPayloadBytes, c.TimeoutSeconds)
+	canonical := fmt.Sprintf("provider=%s\nmode=%s\nmodel=%s\nbase_url=%s\nmax_attempts=%d\nmax_payload_bytes=%d\ntimeout_seconds=%d\nbatch_size=%d\n",
+		c.Provider, c.Mode, c.Model, c.BaseURL, c.MaxAttempts, c.MaxPayloadBytes, c.TimeoutSeconds, c.BatchSize)
 	sum := sha256.Sum256([]byte(canonical))
 	return "sha256:" + hex.EncodeToString(sum[:])
 }

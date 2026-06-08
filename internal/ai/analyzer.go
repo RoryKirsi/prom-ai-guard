@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"prom-ai-guard/internal/model"
@@ -30,6 +31,7 @@ type Analyzer struct {
 	Mode             string // ModeLLMFullScan | ModeLocalRules
 	Scope            string // ScopeAll | ScopeInvalid
 	MaxAttempts      int
+	BatchSize        int // LLM FullScan batch size (<=0 -> 50)
 	MaxPayloadBytes  int
 	ConfigHash       string
 	RedactionEnabled bool
@@ -62,29 +64,106 @@ func (a Analyzer) Run(ctx context.Context, scanID string, profiles []profile.Met
 			"missing "+a.keyEnvName(), 0, true, 0, localSummary(ruleInvalids), true)
 	}
 
-	payload := buildPayload(scanID, inScopeProfiles(profiles, inScope))
-	user, err := userPrompt(payload)
-	if err != nil {
-		return a.result(baseline, order, StatusFallback, MethodLocalRulesFallback,
-			"payload_encode_error", 0, true, 0, localSummary(ruleInvalids), true)
+	// FullScan batching: split the in-scope profiles into deterministic batches
+	// (sorted by metric_name), call the LLM per batch, merge into the baseline.
+	sort.Strings(inScope)
+	size := a.BatchSize
+	if size <= 0 {
+		size = 50
 	}
-	if len(user) > a.MaxPayloadBytes {
-		return a.result(baseline, order, StatusFallback, MethodLocalRulesFallback,
-			"payload_too_large", 0, true, 0, localSummary(ruleInvalids), true)
+	batches := chunk(inScope, size)
+	if len(batches) == 0 {
+		// Nothing in scope for the LLM (e.g. ai-scope=invalid with no invalids).
+		res := a.result(baseline, order, StatusSuccess, MethodLLMFullScan, "", 0, false, 0,
+			localSummary(collectInvalids(baseline, order)), true)
+		setBatchMeta(&res.Info, batchMeta{size: size}, false)
+		return res
 	}
 
-	resp, attempts, callErr := a.call(ctx, string(user))
-	if callErr != nil {
-		return a.result(baseline, order, StatusFallback, MethodLocalRulesFallback,
-			categorize(callErr), attempts, true, 0, localSummary(ruleInvalids), true)
+	var totalAttempts, applied, successful int
+	failures := []BatchFailure{}
+	summary := ""
+	for i, batch := range batches {
+		user, err := userPrompt(buildPayload(scanID, inScopeProfiles(profiles, batch)))
+		if err != nil {
+			failures = append(failures, BatchFailure{BatchIndex: i, MetricCount: len(batch), Reason: "payload_encode_error"})
+			continue
+		}
+		// Oversized batch: skip the LLM call entirely; later batches still run.
+		if len(user) > a.MaxPayloadBytes {
+			failures = append(failures, BatchFailure{BatchIndex: i, MetricCount: len(batch), Reason: "payload_too_large"})
+			continue
+		}
+		resp, attempts, callErr := a.call(ctx, string(user))
+		totalAttempts += attempts
+		if callErr != nil {
+			failures = append(failures, BatchFailure{BatchIndex: i, MetricCount: len(batch), Reason: categorize(callErr)})
+			continue
+		}
+		applied += a.applyBatch(baseline, batch, resp)
+		successful++
+		if strings.TrimSpace(resp.Summary) != "" {
+			summary = resp.Summary
+		}
 	}
 
-	applied, status := a.apply(baseline, inScope, resp)
-	summary := resp.Summary
+	meta := batchMeta{inScope: len(inScope), size: size, count: len(batches), successful: successful, failed: len(failures), failures: failures}
+
+	// No batch succeeded -> FULL fallback (deterministic baseline, fallback_used=true).
+	if successful == 0 {
+		reason := failures[0].Reason
+		res := a.result(baseline, order, StatusFallback, MethodLocalRulesFallback, reason,
+			totalAttempts, true, 0, localSummary(ruleInvalids), true)
+		setBatchMeta(&res.Info, meta, false)
+		return res
+	}
+
+	// At least one batch succeeded. partial if any batch failed OR a metric was not
+	// applied; partial_fallback_used is true only when a batch actually failed.
+	status := StatusSuccess
+	partialFallback := false
+	if meta.failed > 0 || applied < len(inScope) {
+		status = StatusPartial
+		partialFallback = meta.failed > 0
+	}
 	if strings.TrimSpace(summary) == "" {
 		summary = localSummary(collectInvalids(baseline, order))
 	}
-	return a.result(baseline, order, status, MethodLLMFullScan, "", attempts, false, applied, summary, true)
+	res := a.result(baseline, order, status, MethodLLMFullScan, "", totalAttempts, false, applied, summary, true)
+	setBatchMeta(&res.Info, meta, partialFallback)
+	return res
+}
+
+// batchMeta carries the aggregate batch counts onto the Info block.
+type batchMeta struct {
+	inScope, size, count, successful, failed int
+	failures                                 []BatchFailure
+}
+
+func setBatchMeta(info *Info, m batchMeta, partialFallback bool) {
+	info.LLMInScopeMetricCount = m.inScope
+	info.BatchSize = m.size
+	info.BatchCount = m.count
+	info.SuccessfulBatches = m.successful
+	info.FailedBatches = m.failed
+	info.BatchFailures = m.failures
+	info.PartialFallbackUsed = partialFallback
+}
+
+// chunk splits names into ordered batches of at most size.
+func chunk(s []string, size int) [][]string {
+	if size <= 0 {
+		size = len(s)
+	}
+	var out [][]string
+	for i := 0; i < len(s); i += size {
+		end := i + size
+		if end > len(s) {
+			end = len(s)
+		}
+		out = append(out, s[i:end])
+	}
+	return out
 }
 
 // keyEnvName returns the configured API-key env var name for messages, falling
@@ -123,8 +202,9 @@ func (a Analyzer) call(ctx context.Context, user string) (aiResponse, int, error
 	return aiResponse{}, attempts, lastErr
 }
 
-// apply merges valid AI entries into the baseline and decides success/partial.
-func (a Analyzer) apply(baseline map[string]*model.MetricAnalysis, inScope []string, resp aiResponse) (analyzed int, status string) {
+// applyBatch merges one batch's valid AI entries into the baseline and returns
+// how many of the batch's metrics were applied (confirmed-valid or upgraded).
+func (a Analyzer) applyBatch(baseline map[string]*model.MetricAnalysis, batch []string, resp aiResponse) int {
 	// Deduplicate by metric_name. Prefer the first usable entry, and prefer an
 	// is_invalid=true finding over a later is_invalid=false entry, so a duplicate
 	// can never silently erase an earlier finding.
@@ -137,8 +217,7 @@ func (a Analyzer) apply(baseline map[string]*model.MetricAnalysis, inScope []str
 	}
 
 	applied := 0
-	for _, name := range inScope {
-		base := baseline[name]
+	for _, name := range batch {
 		entry, ok := byName[name]
 		if !ok {
 			continue // missing entry -> not applied
@@ -151,14 +230,10 @@ func (a Analyzer) apply(baseline map[string]*model.MetricAnalysis, inScope []str
 		if len(validTypes) == 0 {
 			continue // is_invalid=true but no usable types -> dropped
 		}
-		mergeInto(base, entry, validTypes)
+		mergeInto(baseline[name], entry, validTypes)
 		applied++
 	}
-
-	if applied == len(inScope) {
-		return applied, StatusSuccess
-	}
-	return applied, StatusPartial
+	return applied
 }
 
 // mergeInto applies an AI finding to the baseline analysis. The risk is

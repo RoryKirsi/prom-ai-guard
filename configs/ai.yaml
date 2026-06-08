@@ -11,3 +11,7 @@ api_key_env: LLM_API_KEY
 max_attempts: 2
 max_payload_bytes: 262144
 timeout_seconds: 30
+# FullScan batching: redacted MetricProfiles are split into batches of this many
+# metrics, each sent as a separate LLM request (controls JSON payload size and
+# profile count). 0 -> default 50. Overridable with --ai-batch-size.
+batch_size: 50

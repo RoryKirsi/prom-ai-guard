@@ -66,4 +66,25 @@ type Info struct {
 	Summary                     string `json:"summary"`
 	HistoricalComparisonSummary string `json:"historical_comparison_summary"`
 	ConfigHash                  string `json:"config_hash"`
+
+	// Slice 14 FullScan batching metadata (omitted for disabled/no-key paths).
+	// PartialFallbackUsed is true when some LLM batches failed (their metrics used
+	// the deterministic baseline) while others succeeded; FallbackUsed stays true
+	// only for a FULL fallback (no batch succeeded), preserving Gate semantics.
+	LLMInScopeMetricCount int            `json:"llm_in_scope_metric_count,omitempty"`
+	BatchSize             int            `json:"batch_size,omitempty"`
+	BatchCount            int            `json:"batch_count,omitempty"`
+	SuccessfulBatches     int            `json:"successful_batches,omitempty"`
+	FailedBatches         int            `json:"failed_batches,omitempty"`
+	PartialFallbackUsed   bool           `json:"partial_fallback_used,omitempty"`
+	BatchFailures         []BatchFailure `json:"batch_failures,omitempty"`
+}
+
+// BatchFailure records one failed LLM batch with a safe reason only — never the
+// prompt, request/response body, headers, or API key. metric_count is the number
+// of metrics in the batch (no metric names).
+type BatchFailure struct {
+	BatchIndex  int    `json:"batch_index"`
+	MetricCount int    `json:"metric_count"`
+	Reason      string `json:"reason"`
 }

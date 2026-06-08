@@ -27,15 +27,16 @@ import (
 const sampleValuesPerLabel = 5
 
 type scanOptions struct {
-	source    string
-	input     string
-	out       string
-	config    string
-	scanScope string
-	aiMode    string
-	aiScope   string
-	model     string
-	baseURL   string
+	source      string
+	input       string
+	out         string
+	config      string
+	scanScope   string
+	aiMode      string
+	aiScope     string
+	model       string
+	baseURL     string
+	aiBatchSize int
 
 	// prometheus_api source
 	promURL        string
@@ -66,6 +67,7 @@ func newScanCmd() *cobra.Command {
 	f.StringVar(&opts.aiScope, "ai-scope", "all", "AI scope: all or invalid")
 	f.StringVar(&opts.model, "model", "", "LLM model, OpenAI-compatible (overrides ai.yaml)")
 	f.StringVar(&opts.baseURL, "base-url", "", "LLM base URL, OpenAI-compatible (overrides ai.yaml)")
+	f.IntVar(&opts.aiBatchSize, "ai-batch-size", 0, "LLM FullScan batch size (0 = use ai.yaml/default 50; overrides ai.yaml)")
 	// prometheus_api source (read-only; metadata-oriented; auth none in this version)
 	f.StringVar(&opts.promURL, "prom-url", "", "Prometheus base URL (required for source=prometheus_api; overrides prometheus.yaml)")
 	f.StringArrayVar(&opts.match, "match", nil, "optional Prometheus series matcher(s); presence makes scan_scope=filtered (repeatable)")
@@ -118,6 +120,9 @@ func runScan(cmd *cobra.Command, opts *scanOptions) error {
 	}
 	if opts.baseURL != "" {
 		aiCfg.BaseURL = opts.baseURL
+	}
+	if cmd.Flags().Changed("ai-batch-size") {
+		aiCfg.BatchSize = opts.aiBatchSize
 	}
 
 	// Acquire metric series from the selected source. On any source error we
@@ -208,6 +213,7 @@ func runScan(cmd *cobra.Command, opts *scanOptions) error {
 		Mode:             opts.aiMode,
 		Scope:            opts.aiScope,
 		MaxAttempts:      aiCfg.MaxAttempts,
+		BatchSize:        aiCfg.BatchSize,
 		MaxPayloadBytes:  aiCfg.MaxPayloadBytes,
 		ConfigHash:       aiCfg.SanitizedHash(),
 		RedactionEnabled: true,
