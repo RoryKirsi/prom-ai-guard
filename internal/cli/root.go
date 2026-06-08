@@ -31,6 +31,7 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(newGateCmd())
 	root.AddCommand(newRelabelCmd())
 	root.AddCommand(newDiffCmd())
+	root.AddCommand(newDoctorCmd())
 	return root
 }
 
