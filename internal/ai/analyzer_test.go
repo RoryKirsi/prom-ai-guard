@@ -60,7 +60,8 @@ func newAnalyzer(mode, scope string, comp Completer, keyPresent bool, maxPayload
 	return Analyzer{
 		Provider: "deepseek", Model: "deepseek-v4-flash", BaseURL: "http://127.0.0.1:1",
 		Mode: mode, Scope: scope, MaxAttempts: 2, MaxPayloadBytes: maxPayload,
-		ConfigHash: "sha256:x", RedactionEnabled: true, KeyPresent: keyPresent, Completer: comp,
+		ConfigHash: "sha256:x", RedactionEnabled: true, KeyPresent: keyPresent,
+		APIKeyEnvName: "LLM_API_KEY", Completer: comp,
 	}
 }
 
@@ -80,7 +81,7 @@ func TestRunSuccess(t *testing.T) {
 {"metric_name":"clean_metric","is_invalid":false}
 ],"summary":"overall governance"}`, nil
 	}}
-	res := newAnalyzer(ModeDeepSeekFullScan, ScopeAll, comp, true, 0).Run(context.Background(), "scan1", mockProfiles(), ruleInvalids())
+	res := newAnalyzer(ModeLLMFullScan, ScopeAll, comp, true, 0).Run(context.Background(), "scan1", mockProfiles(), ruleInvalids())
 
 	if res.Info.Status != StatusSuccess {
 		t.Fatalf("status = %q, want success", res.Info.Status)
@@ -108,7 +109,7 @@ func TestRunPartialMissingEntry(t *testing.T) {
 		// only one of two in-scope metrics returned
 		return `{"metrics":[{"metric_name":"http_user_requests_total","is_invalid":true,"invalid_types":["high_cardinality"],"risk_level":"severe","risk_reason":"r","root_cause":"rc","recommendations":["x"],"confidence":0.8}],"summary":"s"}`, nil
 	}}
-	res := newAnalyzer(ModeDeepSeekFullScan, ScopeAll, comp, true, 0).Run(context.Background(), "s", mockProfiles(), ruleInvalids())
+	res := newAnalyzer(ModeLLMFullScan, ScopeAll, comp, true, 0).Run(context.Background(), "s", mockProfiles(), ruleInvalids())
 	if res.Info.Status != StatusPartial {
 		t.Fatalf("status = %q, want partial", res.Info.Status)
 	}
@@ -124,7 +125,7 @@ func TestRunPartialEmptyTypesDropped(t *testing.T) {
 {"metric_name":"clean_metric","is_invalid":true,"invalid_types":[]}
 ],"summary":"s"}`, nil
 	}}
-	res := newAnalyzer(ModeDeepSeekFullScan, ScopeAll, comp, true, 0).Run(context.Background(), "s", mockProfiles(), ruleInvalids())
+	res := newAnalyzer(ModeLLMFullScan, ScopeAll, comp, true, 0).Run(context.Background(), "s", mockProfiles(), ruleInvalids())
 	// clean_metric entry is dropped (is_invalid true but no types) -> partial.
 	if res.Info.Status != StatusPartial {
 		t.Fatalf("status = %q, want partial", res.Info.Status)
@@ -139,7 +140,7 @@ func TestRunTwoFailuresFallback(t *testing.T) {
 	comp := &mockCompleter{fn: func(int, string) (string, error) {
 		return "", errors.New("llm request failed: status 500")
 	}}
-	res := newAnalyzer(ModeDeepSeekFullScan, ScopeAll, comp, true, 0).Run(context.Background(), "s", mockProfiles(), ruleInvalids())
+	res := newAnalyzer(ModeLLMFullScan, ScopeAll, comp, true, 0).Run(context.Background(), "s", mockProfiles(), ruleInvalids())
 	if res.Info.Status != StatusFallback || res.Info.AttemptCount != 2 || !res.Info.FallbackUsed {
 		t.Fatalf("info = %+v", res.Info)
 	}
@@ -157,7 +158,7 @@ func TestRunTwoFailuresFallback(t *testing.T) {
 
 func TestRunMalformedTwiceFallback(t *testing.T) {
 	comp := &mockCompleter{fn: func(int, string) (string, error) { return "not json at all", nil }}
-	res := newAnalyzer(ModeDeepSeekFullScan, ScopeAll, comp, true, 0).Run(context.Background(), "s", mockProfiles(), ruleInvalids())
+	res := newAnalyzer(ModeLLMFullScan, ScopeAll, comp, true, 0).Run(context.Background(), "s", mockProfiles(), ruleInvalids())
 	if res.Info.Status != StatusFallback || res.Info.AttemptCount != 2 {
 		t.Fatalf("info = %+v", res.Info)
 	}
@@ -165,7 +166,7 @@ func TestRunMalformedTwiceFallback(t *testing.T) {
 
 func TestRunPayloadTooLarge(t *testing.T) {
 	comp := &mockCompleter{fn: func(int, string) (string, error) { return `{"metrics":[]}`, nil }}
-	res := newAnalyzer(ModeDeepSeekFullScan, ScopeAll, comp, true, 10).Run(context.Background(), "s", mockProfiles(), ruleInvalids())
+	res := newAnalyzer(ModeLLMFullScan, ScopeAll, comp, true, 10).Run(context.Background(), "s", mockProfiles(), ruleInvalids())
 	if res.Info.Status != StatusFallback || res.Info.FallbackReason != "payload_too_large" {
 		t.Fatalf("info = %+v", res.Info)
 	}
@@ -191,8 +192,8 @@ func TestRunDisabledLocalRules(t *testing.T) {
 
 func TestRunMissingKeyFallback(t *testing.T) {
 	comp := &mockCompleter{fn: func(int, string) (string, error) { t.Fatal("must not call AI"); return "", nil }}
-	res := newAnalyzer(ModeDeepSeekFullScan, ScopeAll, comp, false, 0).Run(context.Background(), "s", mockProfiles(), ruleInvalids())
-	if res.Info.Status != StatusFallback || res.Info.FallbackReason != "missing DEEPSEEK_API_KEY" || res.Info.AttemptCount != 0 {
+	res := newAnalyzer(ModeLLMFullScan, ScopeAll, comp, false, 0).Run(context.Background(), "s", mockProfiles(), ruleInvalids())
+	if res.Info.Status != StatusFallback || res.Info.FallbackReason != "missing LLM_API_KEY" || res.Info.AttemptCount != 0 {
 		t.Fatalf("info = %+v", res.Info)
 	}
 }
@@ -204,7 +205,7 @@ func TestRunAIAddsFindingToValidMetric(t *testing.T) {
 {"metric_name":"clean_metric","is_invalid":true,"invalid_types":["deprecated_metric"],"risk_level":"warning","risk_reason":"legacy naming","root_cause":"ai found legacy","recommendations":["rename"],"confidence":0.7}
 ],"summary":"s"}`, nil
 	}}
-	res := newAnalyzer(ModeDeepSeekFullScan, ScopeAll, comp, true, 0).Run(context.Background(), "s", mockProfiles(), ruleInvalids())
+	res := newAnalyzer(ModeLLMFullScan, ScopeAll, comp, true, 0).Run(context.Background(), "s", mockProfiles(), ruleInvalids())
 	if res.Info.Status != StatusSuccess {
 		t.Fatalf("status = %q", res.Info.Status)
 	}
@@ -233,7 +234,7 @@ func TestRunDuplicateEntryDoesNotEraseFinding(t *testing.T) {
 {"metric_name":"clean_metric","is_invalid":true,"invalid_types":["deprecated_metric"],"risk_level":"warning","risk_reason":"r","root_cause":"rc","recommendations":["x"],"confidence":0.8}
 ],"summary":"s"}`, nil
 	}}
-	res := newAnalyzer(ModeDeepSeekFullScan, ScopeAll, comp, true, 0).Run(context.Background(), "s", mockProfiles(), ruleInvalids())
+	res := newAnalyzer(ModeLLMFullScan, ScopeAll, comp, true, 0).Run(context.Background(), "s", mockProfiles(), ruleInvalids())
 	if _, ok := findInvalid(res.Invalids, "clean_metric"); !ok {
 		t.Errorf("a later duplicate must not erase the AI finding for clean_metric")
 	}
@@ -247,7 +248,7 @@ func TestRunNeverDowngradesSevere(t *testing.T) {
 {"metric_name":"clean_metric","is_invalid":false}
 ],"summary":"s"}`, nil
 	}}
-	res := newAnalyzer(ModeDeepSeekFullScan, ScopeAll, comp, true, 0).Run(context.Background(), "s", mockProfiles(), ruleInvalids())
+	res := newAnalyzer(ModeLLMFullScan, ScopeAll, comp, true, 0).Run(context.Background(), "s", mockProfiles(), ruleInvalids())
 	a, _ := findInvalid(res.Invalids, "http_user_requests_total")
 	if a.RiskLevel != "severe" {
 		t.Errorf("severity downgraded to %q; rule severe must be a floor", a.RiskLevel)
@@ -260,7 +261,7 @@ func TestRunNeverDowngradesSevere(t *testing.T) {
 
 func TestRunPayloadHasNoRawSensitiveValue(t *testing.T) {
 	comp := &mockCompleter{fn: func(int, string) (string, error) { return `{"metrics":[],"summary":"s"}`, nil }}
-	_ = newAnalyzer(ModeDeepSeekFullScan, ScopeAll, comp, true, 0).Run(context.Background(), "s", mockProfiles(), ruleInvalids())
+	_ = newAnalyzer(ModeLLMFullScan, ScopeAll, comp, true, 0).Run(context.Background(), "s", mockProfiles(), ruleInvalids())
 	// profiles are pre-redacted; the outbound payload must contain only placeholders.
 	if strings.Contains(comp.lastUser, "u1") || strings.Contains(comp.lastUser, "u2") {
 		t.Errorf("raw sensitive value present in outbound payload")

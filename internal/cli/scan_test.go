@@ -36,10 +36,10 @@ services:
     owner: team
 `)
 	writeFile(t, filepath.Join(dir, "ai.yaml"), `provider: deepseek
-mode: deepseek_fullscan
+mode: llm_fullscan
 model: deepseek-v4-flash
 base_url: https://api.deepseek.com
-api_key_env: DEEPSEEK_API_KEY
+api_key_env: LLM_API_KEY
 max_attempts: 2
 max_payload_bytes: 262144
 timeout_seconds: 5
@@ -90,9 +90,9 @@ func readAIBlock(t *testing.T, outDir string) aiBlock {
 	return rep.AI
 }
 
-func TestScanDeepSeekSecretNeverLeaks(t *testing.T) {
+func TestScanLLMSecretNeverLeaks(t *testing.T) {
 	const secret = "TESTSECRET123"
-	t.Setenv("DEEPSEEK_API_KEY", secret)
+	t.Setenv("LLM_API_KEY", secret)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := r.Header.Get("Authorization"); got != "Bearer "+secret {
@@ -107,7 +107,7 @@ func TestScanDeepSeekSecretNeverLeaks(t *testing.T) {
 	outDir := t.TempDir()
 
 	out, err := runScanCmd(t, "--input", metrics, "--config", cfg, "--out", outDir,
-		"--ai-mode", "deepseek_fullscan", "--base-url", srv.URL)
+		"--ai-mode", "llm_fullscan", "--base-url", srv.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +131,7 @@ func TestScanDeepSeekSecretNeverLeaks(t *testing.T) {
 }
 
 func TestScanLocalRulesDisabled(t *testing.T) {
-	t.Setenv("DEEPSEEK_API_KEY", "shouldnotbeused")
+	t.Setenv("LLM_API_KEY", "shouldnotbeused")
 	cfg := setupConfigDir(t)
 	metrics := setupMetrics(t)
 	outDir := t.TempDir()
@@ -146,16 +146,16 @@ func TestScanLocalRulesDisabled(t *testing.T) {
 }
 
 func TestScanFallbackWhenKeyMissing(t *testing.T) {
-	t.Setenv("DEEPSEEK_API_KEY", "")
+	t.Setenv("LLM_API_KEY", "")
 	cfg := setupConfigDir(t)
 	metrics := setupMetrics(t)
 	outDir := t.TempDir()
 
-	if _, err := runScanCmd(t, "--input", metrics, "--config", cfg, "--out", outDir, "--ai-mode", "deepseek_fullscan"); err != nil {
+	if _, err := runScanCmd(t, "--input", metrics, "--config", cfg, "--out", outDir, "--ai-mode", "llm_fullscan"); err != nil {
 		t.Fatal(err)
 	}
 	ai := readAIBlock(t, outDir)
-	if ai.Status != "fallback" || !strings.Contains(ai.FallbackReason, "DEEPSEEK_API_KEY") {
+	if ai.Status != "fallback" || !strings.Contains(ai.FallbackReason, "LLM_API_KEY") {
 		t.Errorf("ai = %+v, want fallback/missing-key", ai)
 	}
 }
@@ -164,7 +164,8 @@ func TestScanRejectsUnsupportedMode(t *testing.T) {
 	cfg := setupConfigDir(t)
 	metrics := setupMetrics(t)
 	outDir := t.TempDir()
-	for _, mode := range []string{"hybrid", "fallback_only"} {
+	// deepseek_fullscan is no longer accepted (alias support removed).
+	for _, mode := range []string{"hybrid", "fallback_only", "deepseek_fullscan"} {
 		if _, err := runScanCmd(t, "--input", metrics, "--config", cfg, "--out", outDir, "--ai-mode", mode); err == nil {
 			t.Errorf("--ai-mode %q should be rejected", mode)
 		}

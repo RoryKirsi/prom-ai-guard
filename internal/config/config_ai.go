@@ -30,10 +30,10 @@ type AIConfig struct {
 func DefaultAIConfig() AIConfig {
 	return AIConfig{
 		Provider:        "deepseek",
-		Mode:            "deepseek_fullscan",
+		Mode:            "llm_fullscan",
 		Model:           "deepseek-v4-flash",
 		BaseURL:         "https://api.deepseek.com",
-		APIKeyEnv:       "DEEPSEEK_API_KEY",
+		APIKeyEnv:       "LLM_API_KEY",
 		MaxAttempts:     2,
 		MaxPayloadBytes: 262144,
 		TimeoutSeconds:  30,

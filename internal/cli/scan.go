@@ -51,7 +51,7 @@ func newScanCmd() *cobra.Command {
 	f.StringVar(&opts.out, "out", "reports", "directory for generated reports")
 	f.StringVar(&opts.config, "config", "configs", "directory holding rules.yaml, service_inventory.yaml, ai.yaml")
 	f.StringVar(&opts.scanScope, "scan-scope", "all", "scan scope: all or filtered")
-	f.StringVar(&opts.aiMode, "ai-mode", "deepseek_fullscan", "AI mode: deepseek_fullscan or local_rules")
+	f.StringVar(&opts.aiMode, "ai-mode", "llm_fullscan", "AI mode: llm_fullscan or local_rules")
 	f.StringVar(&opts.aiScope, "ai-scope", "all", "AI scope: all or invalid")
 	f.StringVar(&opts.model, "model", "", "LLM model, OpenAI-compatible (overrides ai.yaml)")
 	f.StringVar(&opts.baseURL, "base-url", "", "LLM base URL, OpenAI-compatible (overrides ai.yaml)")
@@ -68,8 +68,8 @@ func runScan(cmd *cobra.Command, opts *scanOptions) error {
 	if opts.scanScope != "all" && opts.scanScope != "filtered" {
 		return fmt.Errorf("--scan-scope %q is invalid; allowed values are %q or %q", opts.scanScope, "all", "filtered")
 	}
-	if opts.aiMode != ai.ModeDeepSeekFullScan && opts.aiMode != ai.ModeLocalRules {
-		return fmt.Errorf("--ai-mode %q is not supported; allowed values are %q or %q", opts.aiMode, ai.ModeDeepSeekFullScan, ai.ModeLocalRules)
+	if opts.aiMode != ai.ModeLLMFullScan && opts.aiMode != ai.ModeLocalRules {
+		return fmt.Errorf("--ai-mode %q is not supported; allowed values are %q or %q", opts.aiMode, ai.ModeLLMFullScan, ai.ModeLocalRules)
 	}
 	if opts.aiScope != ai.ScopeAll && opts.aiScope != ai.ScopeInvalid {
 		return fmt.Errorf("--ai-scope %q is invalid; allowed values are %q or %q", opts.aiScope, ai.ScopeAll, ai.ScopeInvalid)
@@ -129,7 +129,7 @@ func runScan(cmd *cobra.Command, opts *scanOptions) error {
 	// AI analysis over the redacted profiles. Merged invalids drive the report.
 	apiKey := os.Getenv(aiCfg.APIKeyEnv)
 	var completer ai.Completer
-	if opts.aiMode == ai.ModeDeepSeekFullScan {
+	if opts.aiMode == ai.ModeLLMFullScan {
 		client, cerr := ai.NewClient(aiCfg.BaseURL, aiCfg.Model, apiKey, time.Duration(aiCfg.TimeoutSeconds)*time.Second)
 		if cerr != nil {
 			return fmt.Errorf("ai client configuration: %w", cerr)
@@ -147,6 +147,7 @@ func runScan(cmd *cobra.Command, opts *scanOptions) error {
 		ConfigHash:       aiCfg.SanitizedHash(),
 		RedactionEnabled: true,
 		KeyPresent:       apiKey != "",
+		APIKeyEnvName:    aiCfg.APIKeyEnv,
 		Completer:        completer,
 	}
 	aiResult := analyzer.Run(cmd.Context(), scanID, redactedProfiles, invalids)

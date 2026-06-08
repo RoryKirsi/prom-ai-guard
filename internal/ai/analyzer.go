@@ -27,13 +27,14 @@ type Analyzer struct {
 	Provider         string
 	Model            string
 	BaseURL          string
-	Mode             string // ModeDeepSeekFullScan | ModeLocalRules
+	Mode             string // ModeLLMFullScan | ModeLocalRules
 	Scope            string // ScopeAll | ScopeInvalid
 	MaxAttempts      int
 	MaxPayloadBytes  int
 	ConfigHash       string
 	RedactionEnabled bool
 	KeyPresent       bool
+	APIKeyEnvName    string    // name of the env var holding the key (for messages only)
 	Completer        Completer // nil for local_rules
 }
 
@@ -55,10 +56,10 @@ func (a Analyzer) Run(ctx context.Context, scanID string, profiles []profile.Met
 			localSummary(ruleInvalids), false)
 	}
 
-	// Enabled (deepseek_fullscan): decide fallback vs call.
+	// Enabled (llm_fullscan): decide fallback vs call.
 	if !a.KeyPresent {
 		return a.result(baseline, order, StatusFallback, MethodLocalRulesFallback,
-			"missing DEEPSEEK_API_KEY", 0, true, 0, localSummary(ruleInvalids), true)
+			"missing "+a.keyEnvName(), 0, true, 0, localSummary(ruleInvalids), true)
 	}
 
 	payload := buildPayload(scanID, inScopeProfiles(profiles, inScope))
@@ -83,7 +84,16 @@ func (a Analyzer) Run(ctx context.Context, scanID string, profiles []profile.Met
 	if strings.TrimSpace(summary) == "" {
 		summary = localSummary(collectInvalids(baseline, order))
 	}
-	return a.result(baseline, order, status, MethodDeepSeekFullScan, "", attempts, false, applied, summary, true)
+	return a.result(baseline, order, status, MethodLLMFullScan, "", attempts, false, applied, summary, true)
+}
+
+// keyEnvName returns the configured API-key env var name for messages, falling
+// back to the provider-neutral default. It never returns the key value.
+func (a Analyzer) keyEnvName() string {
+	if a.APIKeyEnvName != "" {
+		return a.APIKeyEnvName
+	}
+	return "LLM_API_KEY"
 }
 
 // call runs the retry loop (up to MaxAttempts). A single attempt covers one

@@ -4,10 +4,10 @@
 # The API key is read from the environment variable named by api_key_env and is
 # never stored in this file.
 provider: deepseek
-mode: deepseek_fullscan
+mode: llm_fullscan
 model: deepseek-v4-flash
 base_url: https://api.deepseek.com
-api_key_env: DEEPSEEK_API_KEY
+api_key_env: LLM_API_KEY
 max_attempts: 2
 max_payload_bytes: 262144
 timeout_seconds: 30

@@ -11,11 +11,12 @@
 // upgrade findings but can never downgrade a deterministic rule severity.
 package ai
 
-// AI modes supported in this slice. hybrid and fallback_only are intentionally
-// not implemented and are rejected by the caller.
+// AI modes. llm_fullscan is the provider-neutral full-scan mode; local_rules
+// disables the LLM. Any other value (e.g. hybrid, fallback_only, or the old
+// deepseek_fullscan) is rejected by the caller.
 const (
-	ModeDeepSeekFullScan = "deepseek_fullscan"
-	ModeLocalRules       = "local_rules"
+	ModeLLMFullScan = "llm_fullscan"
+	ModeLocalRules  = "local_rules"
 )
 
 // AI scopes.
@@ -34,7 +35,7 @@ const (
 
 // analysis_method values.
 const (
-	MethodDeepSeekFullScan   = "deepseek_fullscan"
+	MethodLLMFullScan        = "llm_fullscan"
 	MethodLocalRulesFallback = "local_rules_fallback"
 	MethodDisabled           = "disabled"
 )
