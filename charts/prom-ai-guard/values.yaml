@@ -1,0 +1,173 @@
+# Default values for prom-ai-guard.
+# This chart runs prom-ai-guard as a batch Job (or CronJob). The DEFAULT render
+# is fully self-contained: source=file scanning a mounted demo metrics file, with
+# AI disabled (local_rules) — it needs no in-cluster Prometheus and no API key.
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: prom-ai-guard
+  tag: ""              # "" -> Chart.AppVersion
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+# Job (default) or CronJob.
+workload:
+  kind: Job
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 600
+  # CronJob-only:
+  schedule: "0 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+
+# Scan invocation. The container ENTRYPOINT is the prom-ai-guard binary; these
+# values build its args. Default subcommand is "scan" with source=file.
+scan:
+  subcommand: scan
+  source: file                       # file (default) | prometheus_api
+  aiMode: local_rules                # local_rules (no key) | llm_fullscan (needs LLM_API_KEY)
+  input: /data/demo_metrics.prom     # used when source=file
+  # Prometheus API mode (supported, NOT the default). Set source: prometheus_api,
+  # then provide promURL (and optional match selectors):
+  promURL: ""                        # e.g. http://prometheus-server.monitoring.svc:9090
+  match: []                          # e.g. ['{__name__=~".+"}']
+  scanScope: all
+
+# Raw args override (takes precedence over scan.* assembly when non-empty).
+args: []
+# Extra args appended after the assembled scan args.
+extraArgs: []
+
+# Config files mounted read-only at /etc/prom-ai-guard (consumed by --config).
+# These are non-secret defaults; tune for your environment. No secrets here.
+config:
+  demoMetrics:
+    enabled: true                    # mounts content at /data/demo_metrics.prom
+    content: |
+      # Tiny demo metrics so the default file-source Job runs with no dependencies.
+      http_user_requests_total{service="payment-api",user_id="u1"} 1
+      http_user_requests_total{service="payment-api",user_id="u2"} 1
+      order_legacy_latency_seconds{service="payment-api"} 1
+  rules: |
+    schema_version: v1
+    thresholds:
+      high_cardinality_label_values: 100
+      high_cardinality_metric_series: 1000
+    patterns:
+      deprecated_metric_names:
+        - "(^|[_:])deprecated([_:]|$)"
+        - "(^|[_:])legacy([_:]|$)"
+      debug_metric_names:
+        - "(^|[_:])debug([_:]|$)"
+        - "(^|[_:])test([_:]|$)"
+        - "(^|[_:])temp([_:]|$)"
+      forbidden_label_keys:
+        - user_id
+        - session_id
+        - trace_id
+        - request_id
+    # Demo-friendly storage-impact thresholds; raise for production scale.
+    storage_impact:
+      high_index_entries: 200
+      medium_index_entries: 50
+      high_label_cardinality: 20
+      medium_label_cardinality: 5
+  inventory: |
+    schema_version: v1
+    services:
+      - namespace: payments
+        service: payment-api
+        owner: platform-observability
+  ai: |
+    provider: deepseek
+    mode: llm_fullscan
+    model: deepseek-v4-flash
+    base_url: https://api.deepseek.com
+    api_key_env: LLM_API_KEY
+    max_attempts: 2
+    max_payload_bytes: 262144
+    timeout_seconds: 20
+  prometheus: |
+    base_url: ""
+    timeout_seconds: 30
+    max_series: 100000
+    max_metric_names: 100000
+    batch_size: 50
+  policy: |
+    schema_version: v1
+    gate:
+      fail_on_schema_error: true
+      fail_on_fallback_used: false
+      max_severe: 0
+      max_warning: 20
+      max_invalid_ratio: 0.3
+      max_high_cardinality_metrics: 5
+      forbidden_label_keys:
+        - user_id
+        - session_id
+
+# LLM_API_KEY is env-only and existingSecret-only. There is NO apiKey field here
+# by design — never put a real key in values.yaml. Pre-create the Secret:
+#   kubectl create secret generic pag-llm --from-literal=LLM_API_KEY=sk-... -n <ns>
+# then set llm.existingSecret=pag-llm. If unset, no key is injected (AI falls back).
+llm:
+  existingSecret: ""
+  secretKey: LLM_API_KEY
+
+# Report artifacts are written to /reports. emptyDir is ephemeral (read them from
+# `kubectl logs` for the console summary, or enable persistence for durable files).
+reports:
+  mountPath: /reports
+  persistence:
+    enabled: false
+    size: 1Gi
+    storageClass: ""
+    existingClaim: ""
+
+extraEnv: []
+extraVolumes: []
+extraVolumeMounts: []
+podAnnotations: {}
+podLabels: {}
+labels: {}
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true       # only /tmp and /reports are writable
+  runAsNonRoot: true
+  capabilities:
+    drop:
+      - ALL
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+  automountServiceAccountToken: false
+
+# The tool needs NO Kubernetes API (Prometheus is reached over HTTP, not K8s
+# discovery), so RBAC is off by default.
+rbac:
+  create: false
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

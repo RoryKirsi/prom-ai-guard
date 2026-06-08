@@ -1,0 +1,11 @@
+{{- if .Values.config.demoMetrics.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "prom-ai-guard.fullname" . }}-metrics
+  labels:
+    {{- include "prom-ai-guard.labels" . | nindent 4 }}
+data:
+  demo_metrics.prom: |
+    {{- .Values.config.demoMetrics.content | nindent 4 }}
+{{- end }}

@@ -1,0 +1,16 @@
+apiVersion: v2
+name: prom-ai-guard
+description: AI-driven Prometheus invalid-metric governance — a batch CLI run as a Job or CronJob (no Service/Ingress).
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.21.0-0"
+keywords:
+  - prometheus
+  - observability
+  - governance
+  - cli
+sources:
+  - https://github.com/RoryKirsi/prom-ai-guard
+maintainers:
+  - name: RoryKirsi

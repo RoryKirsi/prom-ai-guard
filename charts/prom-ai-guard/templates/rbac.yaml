@@ -1,0 +1,28 @@
+{{- if .Values.rbac.create }}
+# prom-ai-guard needs NO Kubernetes API by default (Prometheus is reached over
+# HTTP, not via the Kubernetes API). This RBAC is rendered ONLY when
+# rbac.create=true and ships an empty rule set — add rules explicitly if a future
+# feature ever requires them.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "prom-ai-guard.fullname" . }}
+  labels:
+    {{- include "prom-ai-guard.labels" . | nindent 4 }}
+rules: []
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "prom-ai-guard.fullname" . }}
+  labels:
+    {{- include "prom-ai-guard.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "prom-ai-guard.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "prom-ai-guard.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

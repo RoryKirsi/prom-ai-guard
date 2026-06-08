@@ -1,0 +1,38 @@
+{{- if eq .Values.workload.kind "Job" }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "prom-ai-guard.fullname" . }}
+  labels:
+    {{- include "prom-ai-guard.labels" . | nindent 4 }}
+spec:
+  backoffLimit: {{ .Values.workload.backoffLimit }}
+  {{- if .Values.workload.ttlSecondsAfterFinished }}
+  ttlSecondsAfterFinished: {{ .Values.workload.ttlSecondsAfterFinished }}
+  {{- end }}
+  template:
+    metadata:
+      labels:
+        {{- include "prom-ai-guard.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- include "prom-ai-guard.podSpec" . | nindent 6 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

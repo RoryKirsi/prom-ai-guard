@@ -1,0 +1,43 @@
+{{- if eq .Values.workload.kind "CronJob" }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "prom-ai-guard.fullname" . }}
+  labels:
+    {{- include "prom-ai-guard.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.workload.schedule | quote }}
+  concurrencyPolicy: {{ .Values.workload.concurrencyPolicy }}
+  successfulJobsHistoryLimit: {{ .Values.workload.successfulJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      backoffLimit: {{ .Values.workload.backoffLimit }}
+      {{- if .Values.workload.ttlSecondsAfterFinished }}
+      ttlSecondsAfterFinished: {{ .Values.workload.ttlSecondsAfterFinished }}
+      {{- end }}
+      template:
+        metadata:
+          labels:
+            {{- include "prom-ai-guard.selectorLabels" . | nindent 12 }}
+            {{- with .Values.podLabels }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.podAnnotations }}
+          annotations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        spec:
+          {{- include "prom-ai-guard.podSpec" . | nindent 10 }}
+          {{- with .Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

@@ -1,0 +1,25 @@
+prom-ai-guard ({{ .Values.workload.kind }}) "{{ include "prom-ai-guard.fullname" . }}" was rendered in namespace "{{ .Release.Namespace }}".
+
+This is a batch CLI (no Service/Ingress). It scans metrics and writes reports to
+{{ .Values.reports.mountPath }}. The console summary goes to the pod logs.
+
+Source mode: {{ .Values.scan.source }}{{ if eq .Values.scan.source "file" }} (input {{ .Values.scan.input }}){{ end }}
+AI mode:     {{ .Values.scan.aiMode }}{{ if not .Values.llm.existingSecret }} (no LLM secret set — AI falls back; deterministic rules are authoritative){{ end }}
+Reports:     {{ if .Values.reports.persistence.enabled }}persistent (PVC){{ else }}emptyDir (ephemeral — read the logs, or enable reports.persistence for durable files){{ end }}
+
+View output:
+{{- if eq .Values.workload.kind "Job" }}
+  kubectl logs -n {{ .Release.Namespace }} job/{{ include "prom-ai-guard.fullname" . }} -f
+{{- else }}
+  kubectl get cronjob -n {{ .Release.Namespace }} {{ include "prom-ai-guard.fullname" . }}
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }} -f
+{{- end }}
+
+Enable the AI (llm_fullscan) without committing a secret:
+  kubectl create secret generic pag-llm \
+    --from-literal=LLM_API_KEY=sk-... -n {{ .Release.Namespace }}
+  helm upgrade {{ .Release.Name }} <chart> -n {{ .Release.Namespace }} \
+    --set scan.aiMode=llm_fullscan --set llm.existingSecret=pag-llm
+
+NOTE: prom-ai-guard never applies relabel rules or mutates Prometheus/Kubernetes.
+relabel_rules.yaml (if produced) is a review-only proposal artifact.

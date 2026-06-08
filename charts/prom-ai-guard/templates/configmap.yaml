@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "prom-ai-guard.fullname" . }}-config
+  labels:
+    {{- include "prom-ai-guard.labels" . | nindent 4 }}
+data:
+  rules.yaml: |
+    {{- .Values.config.rules | nindent 4 }}
+  service_inventory.yaml: |
+    {{- .Values.config.inventory | nindent 4 }}
+  ai.yaml: |
+    {{- .Values.config.ai | nindent 4 }}
+  prometheus.yaml: |
+    {{- .Values.config.prometheus | nindent 4 }}
+  policy.yaml: |
+    {{- .Values.config.policy | nindent 4 }}

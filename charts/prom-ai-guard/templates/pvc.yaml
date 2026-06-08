@@ -1,0 +1,17 @@
+{{- if and .Values.reports.persistence.enabled (not .Values.reports.persistence.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "prom-ai-guard.fullname" . }}-reports
+  labels:
+    {{- include "prom-ai-guard.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.reports.persistence.size }}
+  {{- with .Values.reports.persistence.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+{{- end }}

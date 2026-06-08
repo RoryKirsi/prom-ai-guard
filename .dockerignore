@@ -1,0 +1,16 @@
+# Keep the build context minimal and never ship secrets or generated artifacts.
+.git
+.gitignore
+.github
+.claude
+.deepseek-v4-flash
+reports/
+docs/
+outputs/
+charts/
+CONTEXT.md
+HANDOFF.md
+需求.md
+Dockerfile
+.dockerignore
+*.xlsx
