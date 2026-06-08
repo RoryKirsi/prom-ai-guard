@@ -176,8 +176,19 @@ func runScan(cmd *cobra.Command, opts *scanOptions) error {
 		Warnings:           warns,
 	}
 
+	// JSON is the machine contract and is written first. Markdown and Excel are
+	// rendered from the same rep object (no analysis re-run); a write failure
+	// there is a tool error (exit 1) but the JSON artifact is already in place.
 	jsonPath := filepath.Join(opts.out, "analysis_report.json")
 	if err := report.WriteJSON(rep, jsonPath); err != nil {
+		return err
+	}
+	mdPath := filepath.Join(opts.out, "analysis_report.md")
+	if err := report.WriteMarkdown(rep, mdPath); err != nil {
+		return err
+	}
+	xlsxPath := filepath.Join(opts.out, "analysis_report.xlsx")
+	if err := report.WriteExcel(rep, xlsxPath); err != nil {
 		return err
 	}
 
@@ -194,7 +205,9 @@ func runScan(cmd *cobra.Command, opts *scanOptions) error {
 	}
 
 	report.PrintConsole(cmd.OutOrStdout(), rep)
-	fmt.Fprintf(cmd.OutOrStdout(), "  report:             %s\n", jsonPath)
+	fmt.Fprintf(cmd.OutOrStdout(), "  report (json):      %s\n", jsonPath)
+	fmt.Fprintf(cmd.OutOrStdout(), "  report (markdown):  %s\n", mdPath)
+	fmt.Fprintf(cmd.OutOrStdout(), "  report (excel):     %s\n", xlsxPath)
 	fmt.Fprintf(cmd.OutOrStdout(), "  ai_input_preview:   %s (redacted_values=%d)\n", previewPath, redaction.RedactedValueCount)
 	return nil
 }

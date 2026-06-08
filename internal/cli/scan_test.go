@@ -145,6 +145,66 @@ func TestScanLocalRulesDisabled(t *testing.T) {
 	}
 }
 
+func TestScanWritesAllReportArtifacts(t *testing.T) {
+	t.Setenv("LLM_API_KEY", "")
+	cfg := setupConfigDir(t)
+	metrics := setupMetrics(t)
+	outDir := t.TempDir()
+
+	if _, err := runScanCmd(t, "--input", metrics, "--config", cfg, "--out", outDir, "--ai-mode", "local_rules"); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"analysis_report.json", "analysis_report.md", "analysis_report.xlsx", "ai_input_preview.json"} {
+		if _, err := os.Stat(filepath.Join(outDir, name)); err != nil {
+			t.Errorf("missing artifact %s: %v", name, err)
+		}
+	}
+}
+
+func TestScanJSONTopLevelKeysUnchanged(t *testing.T) {
+	t.Setenv("LLM_API_KEY", "")
+	cfg := setupConfigDir(t)
+	metrics := setupMetrics(t)
+	outDir := t.TempDir()
+
+	if _, err := runScanCmd(t, "--input", metrics, "--config", cfg, "--out", outDir, "--ai-mode", "local_rules"); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(outDir, "analysis_report.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var top map[string]json.RawMessage
+	if err := json.Unmarshal(data, &top); err != nil {
+		t.Fatal(err)
+	}
+	// The Slice 4 contract: adding Markdown/Excel must not change the JSON schema.
+	want := []string{
+		"schema_version", "scan_id", "scan_time", "tool_version", "config_hash",
+		"source", "ai", "summary", "invalid_metrics", "top_risk_metrics",
+		"top_violation_labels", "warnings",
+	}
+	if len(top) != len(want) {
+		t.Errorf("JSON has %d top-level keys, want %d: %v", len(top), len(want), keysOf(top))
+	}
+	for _, k := range want {
+		if _, ok := top[k]; !ok {
+			t.Errorf("JSON missing top-level key %q (schema drift)", k)
+		}
+	}
+	if _, ok := top["report_generation_status"]; ok {
+		t.Errorf("report_generation_status must not be added to JSON in Slice 5")
+	}
+}
+
+func keysOf(m map[string]json.RawMessage) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
+}
+
 func TestScanFallbackWhenKeyMissing(t *testing.T) {
 	t.Setenv("LLM_API_KEY", "")
 	cfg := setupConfigDir(t)
