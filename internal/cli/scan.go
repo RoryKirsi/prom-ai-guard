@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"prom-ai-guard/internal/ai"
+	"prom-ai-guard/internal/auditlog"
 	"prom-ai-guard/internal/config"
 	"prom-ai-guard/internal/model"
 	"prom-ai-guard/internal/parser"
@@ -79,7 +80,7 @@ func newScanCmd() *cobra.Command {
 	return cmd
 }
 
-func runScan(cmd *cobra.Command, opts *scanOptions) error {
+func runScan(cmd *cobra.Command, opts *scanOptions) (err error) {
 	if opts.source != "file" && opts.source != "prometheus_api" {
 		return fmt.Errorf("--source %q is invalid; allowed values are %q or %q", opts.source, "file", "prometheus_api")
 	}
@@ -95,6 +96,27 @@ func runScan(cmd *cobra.Command, opts *scanOptions) error {
 	if opts.aiScope != ai.ScopeAll && opts.aiScope != ai.ScopeInvalid {
 		return fmt.Errorf("--ai-scope %q is invalid; allowed values are %q or %q", opts.aiScope, ai.ScopeAll, ai.ScopeInvalid)
 	}
+
+	now := time.Now().UTC()
+	scanID := now.Format("20060102T150405Z") + "-scan"
+
+	// Audit log: a safe JSONL trail under --out (reports/scan.log.jsonl), overwritten
+	// per scan. It is secondary — an open/write failure warns once to stderr and never
+	// fails the scan. A nil logger is a no-op. scan_failed is emitted via the defer.
+	var alog *auditlog.Logger
+	if mkErr := os.MkdirAll(opts.out, 0o755); mkErr != nil {
+		fmt.Fprintf(cmd.ErrOrStderr(), "warning: cannot create %s for scan.log.jsonl: %v; continuing without audit log\n", opts.out, mkErr)
+	} else if lf, oErr := os.OpenFile(filepath.Join(opts.out, "scan.log.jsonl"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644); oErr != nil {
+		fmt.Fprintf(cmd.ErrOrStderr(), "warning: cannot open scan.log.jsonl: %v; continuing without audit log\n", oErr)
+	} else {
+		alog = auditlog.New(lf, cmd.ErrOrStderr(), scanID)
+		defer lf.Close()
+	}
+	defer func() {
+		if err != nil {
+			alog.ScanFailed(err.Error())
+		}
+	}()
 
 	rulesPath := filepath.Join(opts.config, "rules.yaml")
 	invPath := filepath.Join(opts.config, "service_inventory.yaml")
@@ -125,6 +147,8 @@ func runScan(cmd *cobra.Command, opts *scanOptions) error {
 		aiCfg.BatchSize = opts.aiBatchSize
 	}
 
+	alog.ScanStarted(opts.source, opts.promURL, opts.input, opts.scanScope, opts.aiMode, opts.aiScope, aiCfg.BatchSize)
+
 	// Acquire metric series from the selected source. On any source error we
 	// return before writing anything, so no partial report is produced.
 	var series []model.MetricSeries
@@ -134,6 +158,7 @@ func runScan(cmd *cobra.Command, opts *scanOptions) error {
 
 	switch opts.source {
 	case "file":
+		alog.SourceReadStarted(opts.source, "", opts.input)
 		f, oerr := os.Open(opts.input)
 		if oerr != nil {
 			return fmt.Errorf("opening input: %w", oerr)
@@ -171,6 +196,7 @@ func runScan(cmd *cobra.Command, opts *scanOptions) error {
 		if cerr != nil {
 			return cerr
 		}
+		alog.SourceReadStarted(opts.source, promURL, "")
 		series, warns, err = client.FetchSeries(cmd.Context(), promapi.Options{Matchers: opts.match, Start: opts.start, End: opts.end})
 		if err != nil {
 			return err
@@ -181,10 +207,13 @@ func runScan(cmd *cobra.Command, opts *scanOptions) error {
 			sourceScanScope = "filtered"
 		}
 	}
+	alog.SourceReadCompleted(opts.source, len(series))
+	alog.ParseWarningsSummary(len(warns))
 
 	stats := tsdb.Build(series)
 	invalids, contribs := rules.Evaluate(stats, rulesCfg, inventory)
 	contexts := rules.Contexts(stats, inventory)
+	alog.LocalRulesCompleted(len(stats), len(series), len(invalids))
 
 	analysesByName := make(map[string]model.MetricAnalysis, len(invalids))
 	for _, a := range invalids {
@@ -192,9 +221,6 @@ func runScan(cmd *cobra.Command, opts *scanOptions) error {
 	}
 	profiles := profile.Build(stats, analysesByName, contexts, sampleValuesPerLabel)
 	redactedProfiles, redaction := redact.Profiles(profiles)
-
-	now := time.Now().UTC()
-	scanID := now.Format("20060102T150405Z") + "-scan"
 
 	// AI analysis over the redacted profiles. Merged invalids drive the report.
 	apiKey := os.Getenv(aiCfg.APIKeyEnv)
@@ -221,7 +247,9 @@ func runScan(cmd *cobra.Command, opts *scanOptions) error {
 		APIKeyEnvName:    aiCfg.APIKeyEnv,
 		Completer:        completer,
 	}
+	alog.AIStarted(opts.aiMode, opts.aiScope, aiCfg.BatchSize)
 	aiResult := analyzer.Run(cmd.Context(), scanID, redactedProfiles, invalids)
+	emitAIEvents(alog, aiResult.Info)
 
 	result := scan.Assemble(len(series), len(stats), aiResult.Invalids, contribs)
 
@@ -265,14 +293,17 @@ func runScan(cmd *cobra.Command, opts *scanOptions) error {
 	if err := report.WriteJSON(rep, jsonPath); err != nil {
 		return err
 	}
+	alog.ReportWritten("json", jsonPath)
 	mdPath := filepath.Join(opts.out, "analysis_report.md")
 	if err := report.WriteMarkdown(rep, mdPath); err != nil {
 		return err
 	}
+	alog.ReportWritten("markdown", mdPath)
 	xlsxPath := filepath.Join(opts.out, "analysis_report.xlsx")
 	if err := report.WriteExcel(rep, xlsxPath); err != nil {
 		return err
 	}
+	alog.ReportWritten("excel", xlsxPath)
 
 	// Redacted AI input preview (separate artifact; never raw sensitive values).
 	preview := report.AIInputPreview{
@@ -285,11 +316,26 @@ func runScan(cmd *cobra.Command, opts *scanOptions) error {
 	if err := report.WriteAIPreview(preview, previewPath); err != nil {
 		return err
 	}
+	alog.ReportWritten("preview", previewPath)
 
 	report.PrintConsole(cmd.OutOrStdout(), rep)
 	fmt.Fprintf(cmd.OutOrStdout(), "  report (json):      %s\n", jsonPath)
 	fmt.Fprintf(cmd.OutOrStdout(), "  report (markdown):  %s\n", mdPath)
 	fmt.Fprintf(cmd.OutOrStdout(), "  report (excel):     %s\n", xlsxPath)
 	fmt.Fprintf(cmd.OutOrStdout(), "  ai_input_preview:   %s (redacted_values=%d)\n", previewPath, redaction.RedactedValueCount)
+
+	alog.ScanCompleted(result.Summary.InvalidMetricNames, result.Summary.RiskDistribution, result.Summary.InvalidRatio, aiInfo.Status)
 	return nil
+}
+
+// emitAIEvents records the AI batch summary, any safe per-batch failures, and the
+// AI completion event from the analyzer's Info block (no prompt/body/key).
+func emitAIEvents(alog *auditlog.Logger, info ai.Info) {
+	if info.BatchCount > 0 {
+		alog.AIBatchSummary(info.BatchSize, info.BatchCount, info.SuccessfulBatches, info.FailedBatches, info.Status)
+	}
+	for _, bf := range info.BatchFailures {
+		alog.AIBatchFailure(bf.BatchIndex, bf.MetricCount, bf.Reason)
+	}
+	alog.AICompleted(info.Status, info.AnalyzedMetricCount, info.LLMInScopeMetricCount, info.FallbackUsed, info.PartialFallbackUsed, info.FallbackReason)
 }
