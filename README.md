@@ -1,9 +1,14 @@
 # prom-ai-guard
 
-[中文](#中文) | [English](#english)
+[![Go](https://img.shields.io/badge/Go-1.24-00ADD8?logo=go&logoColor=white)](go.mod) ![Interface](https://img.shields.io/badge/interface-CLI-555) ![Prometheus](https://img.shields.io/badge/Prometheus-metric%20governance-E6522C?logo=prometheus&logoColor=white) ![AI](https://img.shields.io/badge/AI-OpenAI--compatible-412991?logo=openai&logoColor=white)
 
-> AI 辅助的 Prometheus 无效指标治理 CLI —— 确定性规则为权威，LLM 为辅助。
-> A Go CLI for AI-assisted Prometheus invalid-metric governance — deterministic rules are authoritative, the LLM is advisory.
+**AI-assisted Prometheus invalid-metric governance** — deterministic local rules are
+authoritative; the LLM is advisory (adds/upgrades findings, never downgrades).
+
+**AI 辅助的 Prometheus 无效指标治理** —— 确定性本地规则为权威；LLM 仅为辅助（只新增 / 升级
+发现，绝不降级）。
+
+[中文](#中文) | [English](#english)
 
 ---
 
@@ -52,6 +57,18 @@ Prometheus。
 | `relabel` | 生成 relabel 提案 | `--report` `--out` | 0 成功 / 1 错误 |
 | `diff` | 对比两份报告 | `--previous` `--current` `--out` `--json` | 0 成功 / 1 工具或 schema 错误 |
 | `doctor`（`inspect`） | 只读聚焦诊断 | `--report` `--metric` `--label` `--service` `--json` | 0 成功 / 1 错误 |
+
+### 安装
+
+```bash
+git clone https://github.com/RoryKirsi/prom-ai-guard.git
+cd prom-ai-guard
+go build ./cmd/prom-ai-guard        # 产出 ./prom-ai-guard（需 Go 1.24+）
+# 或安装到 $GOBIN：
+go install ./cmd/prom-ai-guard
+```
+
+也可用容器运行（见下方 Docker 一节）。
 
 ### 快速开始：本地文件扫描
 
@@ -257,16 +274,6 @@ helm install pag charts/prom-ai-guard -n prom-ai-guard -f values-prom.yaml
 
 冒烟环境随后已清理。
 
-### 已知限制 / 本次不包含
-
-- **Prometheus 认证（bearer / basic / 自定义头）**：本次交付不包含；当前为无认证只读接入。
-- **LLM 历史 diff 摘要**：本次交付不包含；`diff` 仅为确定性对比。
-- **gate forbidden-label 来源加固**：本次交付不包含。
-- **模型相关批大小调优**：LLM 成功率取决于 provider/model/batch 大小（见 K3s 结论），按模型调
-  `--ai-batch-size`。
-- **范围外**：不做 Web UI；不自动应用 relabel；不解析真实 TSDB block / WAL / chunk（存储影响为
-  启发式，非字节）。`service_inventory.yaml` 应映射基础设施 job，否则其指标会被报为 orphan。
-
 ---
 
 ## English
@@ -312,6 +319,18 @@ ever mutating Prometheus.
 | `relabel` | Generate a relabel proposal | `--report`, `--out` | 0 ok / 1 error |
 | `diff` | Compare two reports | `--previous`, `--current`, `--out`, `--json` | 0 success / 1 tool or schema error |
 | `doctor` (`inspect`) | Read-only focused diagnosis | `--report`, `--metric`, `--label`, `--service`, `--json` | 0 ok / 1 error |
+
+### Install
+
+```bash
+git clone https://github.com/RoryKirsi/prom-ai-guard.git
+cd prom-ai-guard
+go build ./cmd/prom-ai-guard        # produces ./prom-ai-guard (Go 1.24+)
+# or install into $GOBIN:
+go install ./cmd/prom-ai-guard
+```
+
+Or run it as a container (see the Docker section below).
 
 ### Quickstart — local file scan
 
@@ -512,12 +531,24 @@ provider:
 
 The smoke-test environment was torn down afterward.
 
-### Known limitations / not included in this delivery
+---
 
-- **Prometheus auth (bearer / basic / custom headers)** — not included in this delivery; access is currently unauthenticated read-only.
-- **LLM historical diff summary** — not included in this delivery; `diff` is a deterministic comparison only.
-- **Gate forbidden-label source hardening** — not included in this delivery.
-- **Model-specific batch tuning** — LLM success depends on provider/model/batch size.
-- **Out of scope** — no Web UI; no automatic relabel apply; no real TSDB block / WAL /
-  chunk parsing (storage impact is a heuristic, not bytes). `service_inventory.yaml`
-  should map infrastructure jobs, otherwise their metrics are reported as orphans.
+## Development
+
+```bash
+go build ./...
+go test ./...
+go vet ./...
+gofmt -l .          # should print nothing
+```
+
+Configuration lives in `configs/` (`rules.yaml`, `policy.yaml`, `service_inventory.yaml`,
+`ai.yaml`, `prometheus.yaml`); demo metrics are in `fixtures/`. Generated reports under
+`reports/` are git-ignored.
+
+## License / 许可
+
+This repository does not currently include a `LICENSE` file, so no open-source license
+is granted; please contact the repository owner before reuse.
+
+本仓库当前未包含 `LICENSE` 文件，因此未授予任何开源许可；如需复用请先联系仓库所有者。
