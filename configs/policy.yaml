@@ -1,0 +1,13 @@
+schema_version: v1
+gate:
+  fail_on_schema_error: true
+  fail_on_fallback_used: false
+  max_severe: 0
+  max_warning: 20
+  max_invalid_ratio: 0.3
+  max_high_cardinality_metrics: 5
+  forbidden_label_keys:
+    - user_id
+    - session_id
+    - trace_id
+    - request_id
