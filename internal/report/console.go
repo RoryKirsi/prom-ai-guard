@@ -4,10 +4,14 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strings"
 )
 
+// consoleRiskListN caps how many invalid metrics the per-metric risk list prints.
+const consoleRiskListN = 10
+
 // PrintConsole writes a structured, human-readable summary of the scan: counts,
-// invalid totals, risk distribution, invalid-type breakdown and parse warnings.
+// invalid totals, risk distribution, the invalid-metric risk list, and warnings.
 func PrintConsole(w io.Writer, r Report) {
 	s := r.Summary
 	fmt.Fprintln(w, "prom-ai-guard scan")
@@ -26,6 +30,20 @@ func PrintConsole(w io.Writer, r Report) {
 	fmt.Fprintln(w, "  invalid_type_counts:")
 	for _, t := range sortedKeys(s.InvalidTypeCounts) {
 		fmt.Fprintf(w, "    - %-20s %d\n", t, s.InvalidTypeCounts[t])
+	}
+
+	// Per-metric risk list (无效指标风险列表): the top invalid metrics ranked by
+	// risk. r.TopRiskMetrics is already sorted by score desc; show up to N.
+	if n := len(r.TopRiskMetrics); n > 0 {
+		shown := n
+		if shown > consoleRiskListN {
+			shown = consoleRiskListN
+		}
+		fmt.Fprintf(w, "  invalid_metrics (risk list, top %d of %d):\n", shown, n)
+		for _, m := range r.TopRiskMetrics[:shown] {
+			fmt.Fprintf(w, "    - %-34s %-8s (%d)  %s\n",
+				m.MetricName, m.RiskLevel, m.RiskScore, strings.Join(m.InvalidTypes, ","))
+		}
 	}
 
 	if si := s.StorageImpact; si != nil {

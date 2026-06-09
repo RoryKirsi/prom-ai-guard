@@ -329,6 +329,9 @@ func runScan(cmd *cobra.Command, opts *scanOptions) (err error) {
 	fmt.Fprintf(cmd.OutOrStdout(), "  report (markdown):  %s\n", mdPath)
 	fmt.Fprintf(cmd.OutOrStdout(), "  report (excel):     %s\n", xlsxPath)
 	fmt.Fprintf(cmd.OutOrStdout(), "  ai_input_preview:   %s (redacted_values=%d)\n", previewPath, redaction.RedactedValueCount)
+	if alog != nil {
+		fmt.Fprintf(cmd.OutOrStdout(), "  analysis_log:       %s\n", filepath.Join(opts.out, "scan.log.jsonl"))
+	}
 
 	alog.ScanCompleted(result.Summary.InvalidMetricNames, result.Summary.RiskDistribution, result.Summary.InvalidRatio, aiInfo.Status)
 	return nil
