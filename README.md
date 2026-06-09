@@ -42,8 +42,9 @@ Prometheus。
 - **LLM 分析**：`llm_fullscan`（provider-neutral，OpenAI-compatible）或 `local_rules`。
 - **MetricProfile 脱敏**：外发前移除敏感标签键 / 值。
 - **存储影响**：对无效指标的 TSDB 索引压力启发式评分（非磁盘字节）。
-- **报告**：JSON（机器契约）/ Markdown / Excel。
-- **审计日志** `scan.log.jsonl`：安全的结构化 JSONL（每次覆盖）。
+- **治理评估**：确定性的批级 `governance_assessment`（成熟度评分启发式、系统性问题、优先级动作、治理规范）+ 可选 LLM 整体叙述 `ai.governance_summary`。
+- **报告**：JSON（机器契约）/ Markdown / Excel；控制台打印无效指标风险列表。
+- **审计日志** `scan.log.jsonl`：安全结构化 JSONL（每次覆盖），含扫描生命周期 + 每个无效指标一条 `metric_classified`（如何被标注）。
 - **`gate`**：确定性门禁，退出码 `0` / `1` / `2`。
 - **`relabel`**：仅生成提案 `relabel_rules.yaml`，永不应用。
 - **`diff`**：两份报告的确定性对比。
@@ -166,14 +167,19 @@ export LLM_API_KEY=...        # 你的 provider key
 
 | 文件 | 说明 |
 |---|---|
-| `analysis_report.json` | 机器契约：`summary`、`invalid_metrics`、`ai` 块、`summary.storage_impact`。 |
-| `analysis_report.md` | 人类可读 Markdown 报告。 |
-| `analysis_report.xlsx` | Excel 报告（摘要、Top 指标、风险分布）。 |
+| `analysis_report.json` | 机器契约：`summary`（含 `storage_impact` 与 `governance_assessment`）、`invalid_metrics`、`ai` 块（含可选 `governance_summary`）。 |
+| `analysis_report.md` | 人类可读 Markdown 报告（含 Governance assessment 一节）。 |
+| `analysis_report.xlsx` | Excel 报告（Summary、Invalid Metrics、Top Risk、Top Violation Labels、Warnings、Storage Impact、Governance）。 |
 | `ai_input_preview.json` | 会发给 LLM 的**脱敏**画像（与实际外发一致）。 |
-| `scan.log.jsonl` | 安全的结构化 JSONL 审计日志（每行一个事件，每次扫描覆盖）。 |
+| `scan.log.jsonl` | 安全结构化 JSONL 审计日志（每次覆盖）：扫描生命周期 + 每个无效指标一条 `metric_classified`（含 `invalid_types`/`risk`/`rule_signals`/`analysis_sources`）。 |
 
 `scan.log.jsonl` 仅含安全字段——绝不含 API key、Authorization 头、原始 prompt、原始 LLM 响应、
-原始 MetricProfile 或原始标签样本；`prom_url` 脱敏为 `scheme://host`。
+原始 MetricProfile 或原始标签**值**；`prom_url` 脱敏为 `scheme://host`（控制台会打印其路径）。
+
+**治理评估**：`summary.governance_assessment` 是**确定性**的批级整体评估（成熟度评分为启发式，非
+SLO/合规认证）；`local_rules` 与 fallback 下也始终生成。`ai.governance_summary` 是可选的 LLM **整体
+叙述**，由聚合后的确定性数据合成，覆盖整批指标（无 LLM 时为空，确定性报告仍完整）。
+
 `summary.storage_impact`（及 `invalid_metrics[].storage_impact`）为索引压力**启发式**评分
 （`series_count * (label_count + 1) + Σ label_cardinality`），是倒排索引压力代理值，**非**磁盘字节。
 
@@ -304,8 +310,9 @@ ever mutating Prometheus.
 - **LLM analysis** — `llm_fullscan` (provider-neutral, OpenAI-compatible) or `local_rules`.
 - **MetricProfile redaction** — sensitive label keys/values stripped before any LLM send.
 - **Storage impact** — heuristic TSDB index-pressure score per invalid metric.
-- **Reports** — JSON (machine contract), Markdown, Excel.
-- **Audit log** — `scan.log.jsonl`, a safe structured JSONL trail.
+- **Governance assessment** — deterministic batch-level `governance_assessment` (heuristic maturity score, top systemic issues, prioritized actions, governance norms) + optional LLM whole-batch narrative `ai.governance_summary`.
+- **Reports** — JSON (machine contract), Markdown, Excel; the console prints the invalid-metric risk list.
+- **Audit log** — `scan.log.jsonl`: scan lifecycle **+ one `metric_classified` event per invalid metric** (how each metric was labelled).
 - **`gate`** — deterministic CI/CD policy gate (exit `0` / `1` / `2`).
 - **`relabel`** — generates a relabel **proposal** (`relabel_rules.yaml`), never applied.
 - **`diff`** — deterministic comparison of two reports.
@@ -414,15 +421,24 @@ reliably parseable responses. In the K3s smoke test, a broad scan of 273 metrics
 ### Report artifacts
 
 All artifacts are written under `--out` (default `reports/`, git-ignored):
-`analysis_report.json` (machine contract: `summary`, `invalid_metrics`, `ai` block,
-`summary.storage_impact`), `analysis_report.md`, `analysis_report.xlsx`,
-`ai_input_preview.json` (the exact **redacted** LLM input), and `scan.log.jsonl` (safe
-JSONL audit, one event per line, overwritten per scan).
+`analysis_report.json` (machine contract: `summary` — incl. `storage_impact` and
+`governance_assessment` —, `invalid_metrics`, and the `ai` block with an optional
+`governance_summary`), `analysis_report.md`, `analysis_report.xlsx` (incl. a `Governance`
+sheet), `ai_input_preview.json` (the exact **redacted** LLM input), and `scan.log.jsonl`.
 
-`scan.log.jsonl` contains only safe fields — never the API key, Authorization header,
-raw prompt, raw LLM response, raw MetricProfile, or raw label samples; `prom_url` is
-sanitized to `scheme://host`. `summary.storage_impact` is a **heuristic** index-pressure
-score (`series_count * (label_count + 1) + Σ label_cardinality`) — **not** disk bytes.
+`scan.log.jsonl` records the scan lifecycle **plus one `metric_classified` event per
+invalid metric** (`invalid_types`/`risk`/`rule_signals`/`analysis_sources`), and contains
+only safe fields — never the API key, Authorization header, raw prompt, raw LLM response,
+raw MetricProfile, or raw label **values**; `prom_url` is sanitized to `scheme://host`
+(the console prints its path).
+
+**Governance assessment.** `summary.governance_assessment` is a **deterministic**
+batch-level report (maturity score is a heuristic — not an SLO/compliance certification);
+it is present even in `local_rules` and fallback runs. `ai.governance_summary` is an
+optional LLM **whole-batch** narrative synthesized from that aggregate; it is empty
+without an LLM, and the deterministic report still renders. `summary.storage_impact` is a
+**heuristic** index-pressure score (`series_count * (label_count + 1) + Σ label_cardinality`)
+— **not** disk bytes.
 
 ### Docker
 
