@@ -25,6 +25,8 @@ prom-ai-guard scan \
 另见：
 - **[diff/](diff/)** —— 历史对比（`diff`）示例：两次扫描的无效指标变化（新增 / 已解决 / 风险上升 / 类型变化）。
 - **[relabel/](relabel/)** —— relabel 提案（`relabel`）示例：从无效指标生成 Prometheus relabel 规则（仅提案，永不应用）。
+- **[gate/](gate/)** —— CI/CD 门禁（`gate`）示例：按 policy 判定，退出码 0/1/2。
+- **[doctor/](doctor/)** —— 单指标只读诊断（`doctor`/`inspect`）示例：按 metric/label/service 聚焦。
 
 说明：
 - LLM 输出**非确定性**（每次措辞不同），故本示例为快照。用 `--ai-mode local_rules`（无需 key）可得
@@ -59,6 +61,8 @@ prom-ai-guard scan \
 See also:
 - **[diff/](diff/)** — a history-diff (`diff`) example: how invalid metrics change between two scans (added / resolved / risk increased / type changes).
 - **[relabel/](relabel/)** — a relabel-proposal (`relabel`) example: Prometheus relabel rules generated from the invalid metrics (proposal only, never applied).
+- **[gate/](gate/)** — a CI/CD gate (`gate`) example: policy decision with exit codes 0/1/2.
+- **[doctor/](doctor/)** — a read-only single-metric diagnosis (`doctor`/`inspect`) example: focus by metric/label/service.
 
 Notes:
 - LLM output is **non-deterministic** (wording differs per run), so this sample is a

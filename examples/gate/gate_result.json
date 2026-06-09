@@ -1,0 +1,21 @@
+{
+  "passed": false,
+  "exit_code": 2,
+  "policy_hits": [
+    {
+      "policy_id": "max_severe",
+      "severity": "severe",
+      "message": "severe=1 exceeds max 0"
+    },
+    {
+      "policy_id": "max_invalid_ratio",
+      "severity": "warning",
+      "message": "invalid_ratio 0.6364 exceeds max 0.3000"
+    },
+    {
+      "policy_id": "forbidden_label_keys",
+      "severity": "severe",
+      "message": "forbidden label key(s) present: user_id"
+    }
+  ]
+}
