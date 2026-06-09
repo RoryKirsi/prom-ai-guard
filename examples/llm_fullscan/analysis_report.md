@@ -19,10 +19,10 @@
 
 - provider: deepseek
 - model: deepseek-v4-flash
-- ai_mode: local_rules (scope: all)
-- status: disabled
-- analyzed_metric_count: 0
-- ai_summary: Local rule analysis: 7 invalid metric(s).
+- ai_mode: llm_fullscan (scope: all)
+- status: success
+- analyzed_metric_count: 11
+- ai_summary: Single metric with an empty label value on 'env' suggests label governance gaps. Prioritize enforcing label hygiene to avoid silent data loss or misinterpretation. Ensure that all mandatory labels are populated or use relabeling to fill defaults.
 
 > Note: the AI summary is advisory. The counts below (Summary, Risk distribution, Invalid type counts) are the authoritative deterministic results.
 
@@ -76,77 +76,84 @@
 
 - invalid_types: invalid_label_name
 - risk: warning (score 60)
-- root_cause: Label name violates the Prometheus naming convention.
-- recommendations: Rename the label to match [a-zA-Z_][a-zA-Z0-9_]*.; Drop the non-conforming label via metric_relabel_configs.
+- risk_reason: Label name 'route:path' contains colon, which is not a valid Prometheus label identifier.
+- root_cause: Misconfiguration in metric instrumentation using colon in label name.
+- recommendations: Rename label 'route:path' to 'route_path' to comply with Prometheus label naming rules.
 - owner/service/namespace: orders-team / order-api / orders
 - series_count: 1
-- analysis_sources: local_rules
+- analysis_sources: local_rules, llm
 - relabel_candidate: true
 
 ### debug_trace_count
 
 - invalid_types: meaningless_metric
 - risk: minor (score 30)
-- root_cause: Metric name matches a debug/test/temp pattern.
-- recommendations: Remove debug/test metrics from production exposition.; Gate temporary metrics behind a flag.
+- risk_reason: Metric 'debug_trace_count' with single series offers no diagnostic value and clutters the metric namespace.
+- root_cause: Leftover debug metric or unused instrumentation.
+- recommendations: Remove if not needed, or convert to a toggle-able debug endpoint.
 - owner/service/namespace: orders-team / order-api / orders
 - series_count: 1
-- analysis_sources: local_rules
+- analysis_sources: local_rules, llm
 - relabel_candidate: true
 
 ### dup_orders_total
 
 - invalid_types: duplicate_metric
 - risk: warning (score 55)
-- root_cause: Duplicate fingerprint: identical metric name and label set reported more than once.
-- recommendations: Deduplicate the exporter output.; Check for double scraping or merged jobs producing identical series.
+- risk_reason: Duplicate series detected: two identical label sets produce the same metric, causing ingestion overhead and potential data inconsistency.
+- root_cause: Multiple scrapes of same endpoints or misconfigured exporters emitting duplicate data.
+- recommendations: Investigate sources emitting duplicate series; deduplicate or drop duplicates via relabeling.
 - owner/service/namespace: orders-team / order-api / orders
 - series_count: 2
-- analysis_sources: local_rules
+- analysis_sources: local_rules, llm
 - relabel_candidate: false
 
 ### ghost_exporter_up
 
 - invalid_types: orphan_metric
 - risk: minor (score 35)
-- root_cause: Metric's service/job does not resolve to any entry in service_inventory.yaml.
-- recommendations: Add the service to service_inventory.yaml or fix the job/service label.; Confirm the owning team and assign remediation.
+- risk_reason: Metric originates from service 'ghost-api' which appears to be decommissioned or not actively scraped.
+- root_cause: Service decommission without cleaning up associated metrics.
+- recommendations: Remove metric if service is decommissioned; or verify its purpose.
 - owner/service/namespace: unknown / ghost-api / -
 - series_count: 1
-- analysis_sources: local_rules
+- analysis_sources: local_rules, llm
 - relabel_candidate: false
 
 ### http_user_requests_total
 
 - invalid_types: high_cardinality
 - risk: severe (score 90)
-- root_cause: High-cardinality or forbidden label creates unbounded time series.
-- recommendations: Remove high-cardinality labels (e.g. user_id) from the metric.; Use logs or tracing for per-entity investigation.; TSDB storage optimization: reduce label "user_id" (3 distinct) — ~13 estimated index entries (heuristic); use recording rules or drop high-cardinality labels via metric_relabel_configs.
+- risk_reason: Label 'user_id' has high cardinality potential; currently 3 values but may grow unbounded with user count.
+- root_cause: Per-user metrics without aggregation; each user creates new series.
+- recommendations: Aggregate user metrics by user segment or remove user_id label if not essential; Implement label whitelisting to prevent unbounded cardinality; Consider using summary/histogram for latency instead of per-user counter; TSDB storage optimization: reduce label "user_id" (3 distinct) — ~13 estimated index entries (heuristic); use recording rules or drop high-cardinality labels via metric_relabel_configs.
 - owner/service/namespace: platform-observability / payment-api / payments
 - series_count: 3
-- analysis_sources: local_rules
+- analysis_sources: local_rules, llm
 - relabel_candidate: true
 
 ### order_legacy_latency_seconds
 
 - invalid_types: deprecated_metric
 - risk: warning (score 50)
-- root_cause: Metric name matches a deprecated/legacy naming pattern.
-- recommendations: Confirm the metric is unused and remove the instrumentation.; Add a metric_relabel drop rule if removal is delayed.
+- risk_reason: Metric is marked as deprecated, indicating it should be replaced or removed.
+- root_cause: Legacy metric from previous instrumentation; not actively used.
+- recommendations: Replace with new latency metric (e.g., order_latency_seconds) if still needed; Remove metric if no consumers exist; Ensure transition plan and monitoring of new metric
 - owner/service/namespace: orders-team / order-api / orders
 - series_count: 1
-- analysis_sources: local_rules
+- analysis_sources: local_rules, llm
 - relabel_candidate: true
 
 ### queue_depth
 
 - invalid_types: empty_label_value
 - risk: warning (score 55)
-- root_cause: Metric carries a label with an empty value.
-- recommendations: Stop emitting empty labels at the source.; Use metric_relabel_configs to drop empty labels.
+- risk_reason: The label 'env' has an empty value, which can cause confusion in queries and aggregation, and may indicate a configuration error or missing metadata.
+- root_cause: Misconfiguration or missing environment label during metric emission.
+- recommendations: Enforce non-empty label values for 'env' via instrumentation or relabeling rules; consider dropping the label if it is not needed, or set a default value like 'unknown'.
 - owner/service/namespace: orders-team / order-api / orders
 - series_count: 1
-- analysis_sources: local_rules
+- analysis_sources: local_rules, llm
 - relabel_candidate: true
 
 ## Storage impact (heuristic)
@@ -206,6 +213,10 @@
 - Prevent duplicate series: one exporter per metric; avoid double scraping / merged jobs.
 - Require owner/service labels and map every scrape job in service_inventory.yaml.
 - Review the generated relabel_rules.yaml via a GitOps PR before applying; gate CI on policy.yaml.
+
+### AI governance narrative (advisory)
+
+> The overall monitoring governance assessment for this batch is concerning. With a maturity grade of D (score 51) and an invalid metric ratio of 63.6%, the observability posture is poor and requires immediate attention. The dominant systemic issue is high cardinality, classified as “severe,” driven by identity labels such as user_id or session_id. This risk alone undermines the stability and cost-efficiency of your Prometheus infrastructure. Additionally, invalid label names, duplicate metrics, and empty label values each represent warn-level issues that erode data quality and reliability. Deprecated, orphan, and meaningless metrics contribute to overall noise, though at lower risk. To remediate, focus first on reducing label cardinality by dropping identity labels or using recording rules. Next, enforce label naming conventions, eliminate duplicates and empty values, and retire deprecated or test metrics. Normalizing the metric inventory by requiring service ownership and validating label budgets will prevent recurrence. A CI gate with policy checks is recommended to enforce these norms at merge time. The majority of risks are warnings, but the single severe cardinality issue must be treated as a top priority to avoid operational degradation.
 
 ## Parse warnings
 
