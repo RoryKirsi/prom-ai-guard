@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="prom-ai-guard logo">
+  <title>prom-ai-guard</title>
+  <!-- shield = governance / guard -->
+  <path d="M128 18 L214 52 V126 C214 184 174 222 128 238 C82 222 42 184 42 126 V52 Z"
+        fill="#0f172a" stroke="#E6522C" stroke-width="11" stroke-linejoin="round"/>
+  <!-- rising metric bars -->
+  <g fill="#E6522C">
+    <rect x="90" y="152" width="15" height="34" rx="3"/>
+    <rect x="118" y="130" width="15" height="56" rx="3"/>
+    <rect x="146" y="108" width="15" height="78" rx="3"/>
+  </g>
+  <!-- trend sparkline + highlighted point (the "AI" insight) -->
+  <path d="M84 122 L118 98 L150 112 L176 80"
+        fill="none" stroke="#f8fafc" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="176" cy="80" r="10" fill="#f8fafc"/>
+</svg>

@@ -1,6 +1,10 @@
+<p align="center">
+  <img src="assets/logo.svg" width="128" alt="prom-ai-guard logo">
+</p>
+
 # prom-ai-guard
 
-[![Go](https://img.shields.io/badge/Go-1.24-00ADD8?logo=go&logoColor=white)](go.mod) ![Interface](https://img.shields.io/badge/interface-CLI-555) ![Prometheus](https://img.shields.io/badge/Prometheus-metric%20governance-E6522C?logo=prometheus&logoColor=white) ![AI](https://img.shields.io/badge/AI-OpenAI--compatible-412991?logo=openai&logoColor=white)
+[![Go](https://img.shields.io/badge/Go-1.24-00ADD8?logo=go&logoColor=white)](go.mod) ![Interface](https://img.shields.io/badge/interface-CLI-555) ![Prometheus](https://img.shields.io/badge/Prometheus-metric%20governance-E6522C?logo=prometheus&logoColor=white) ![AI](https://img.shields.io/badge/AI-OpenAI--compatible-412991?logo=openai&logoColor=white) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 **AI-assisted Prometheus invalid-metric governance** — deterministic local rules are
 authoritative; the LLM is advisory (adds/upgrades findings, never downgrades).
@@ -323,8 +327,6 @@ helm install pag charts/prom-ai-guard -n prom-ai-guard -f values-prom.yaml
 - 同样 broad run `batch_size=5` 成功，**273/273** 已分析；
 - LLM 在真实数据上**新增了语义发现**（确定性基线仍为权威）。
 
-冒烟环境随后已清理。
-
 ---
 
 ## English
@@ -606,8 +608,6 @@ provider:
 - The LLM **added semantic findings on the live data** (the deterministic baseline
   remained authoritative).
 
-The smoke-test environment was torn down afterward.
-
 ---
 
 ## Development
@@ -625,7 +625,6 @@ Configuration lives in `configs/` (`rules.yaml`, `policy.yaml`, `service_invento
 
 ## License / 许可
 
-This repository does not currently include a `LICENSE` file, so no open-source license
-is granted; please contact the repository owner before reuse.
+Licensed under the [MIT License](LICENSE).
 
-本仓库当前未包含 `LICENSE` 文件，因此未授予任何开源许可；如需复用请先联系仓库所有者。
+本项目以 [MIT License](LICENSE) 开源。
