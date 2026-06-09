@@ -1,0 +1,290 @@
+{
+  "schema_version": "v1",
+  "scan_id": "20260609T020105Z-scan",
+  "redaction": {
+    "enabled": true,
+    "sensitive_label_keys": [
+      "user_id"
+    ],
+    "redacted_value_count": 3
+  },
+  "profiles": [
+    {
+      "metric_name": "cache_hits_total",
+      "series_count": 1,
+      "label_keys": [
+        "route:path",
+        "service"
+      ],
+      "label_cardinality": {
+        "route:path": 1,
+        "service": 1
+      },
+      "sample_label_values": {
+        "route:path": [
+          "/checkout"
+        ],
+        "service": [
+          "order-api"
+        ]
+      },
+      "owner": "orders-team",
+      "service": "order-api",
+      "namespace": "orders",
+      "jobs": [],
+      "rule_signals": [
+        "label:route:path:invalid_name"
+      ],
+      "invalid_types": [
+        "invalid_label_name"
+      ]
+    },
+    {
+      "metric_name": "debug_trace_count",
+      "series_count": 1,
+      "label_keys": [
+        "service"
+      ],
+      "label_cardinality": {
+        "service": 1
+      },
+      "sample_label_values": {
+        "service": [
+          "order-api"
+        ]
+      },
+      "owner": "orders-team",
+      "service": "order-api",
+      "namespace": "orders",
+      "jobs": [],
+      "rule_signals": [
+        "metric:meaningless"
+      ],
+      "invalid_types": [
+        "meaningless_metric"
+      ]
+    },
+    {
+      "metric_name": "dup_orders_total",
+      "series_count": 2,
+      "label_keys": [
+        "service",
+        "shard"
+      ],
+      "label_cardinality": {
+        "service": 1,
+        "shard": 1
+      },
+      "sample_label_values": {
+        "service": [
+          "order-api"
+        ],
+        "shard": [
+          "a"
+        ]
+      },
+      "owner": "orders-team",
+      "service": "order-api",
+      "namespace": "orders",
+      "jobs": [],
+      "rule_signals": [
+        "metric:duplicate_series"
+      ],
+      "invalid_types": [
+        "duplicate_metric"
+      ]
+    },
+    {
+      "metric_name": "ghost_exporter_up",
+      "series_count": 1,
+      "label_keys": [
+        "service"
+      ],
+      "label_cardinality": {
+        "service": 1
+      },
+      "sample_label_values": {
+        "service": [
+          "ghost-api"
+        ]
+      },
+      "owner": "unknown",
+      "service": "ghost-api",
+      "namespace": "",
+      "jobs": [],
+      "rule_signals": [
+        "service:orphan"
+      ],
+      "invalid_types": [
+        "orphan_metric"
+      ]
+    },
+    {
+      "metric_name": "go_memstats_alloc_bytes",
+      "series_count": 1,
+      "label_keys": [],
+      "label_cardinality": {},
+      "sample_label_values": {},
+      "owner": "",
+      "service": "",
+      "namespace": "",
+      "jobs": [],
+      "rule_signals": [],
+      "invalid_types": []
+    },
+    {
+      "metric_name": "http_requests_total",
+      "series_count": 3,
+      "label_keys": [
+        "code",
+        "method",
+        "service"
+      ],
+      "label_cardinality": {
+        "code": 2,
+        "method": 2,
+        "service": 1
+      },
+      "sample_label_values": {
+        "code": [
+          "200",
+          "500"
+        ],
+        "method": [
+          "GET",
+          "POST"
+        ],
+        "service": [
+          "payment-api"
+        ]
+      },
+      "owner": "platform-observability",
+      "service": "payment-api",
+      "namespace": "payments",
+      "jobs": [],
+      "rule_signals": [],
+      "invalid_types": []
+    },
+    {
+      "metric_name": "http_user_requests_total",
+      "series_count": 3,
+      "label_keys": [
+        "service",
+        "user_id"
+      ],
+      "label_cardinality": {
+        "service": 1,
+        "user_id": 3
+      },
+      "sample_label_values": {
+        "service": [
+          "payment-api"
+        ],
+        "user_id": [
+          "<redacted>",
+          "<redacted>",
+          "<redacted>"
+        ]
+      },
+      "owner": "platform-observability",
+      "service": "payment-api",
+      "namespace": "payments",
+      "jobs": [],
+      "rule_signals": [
+        "label:user_id:high_cardinality"
+      ],
+      "invalid_types": [
+        "high_cardinality"
+      ]
+    },
+    {
+      "metric_name": "node_load1",
+      "series_count": 1,
+      "label_keys": [
+        "instance"
+      ],
+      "label_cardinality": {
+        "instance": 1
+      },
+      "sample_label_values": {
+        "instance": [
+          "node-1"
+        ]
+      },
+      "owner": "",
+      "service": "",
+      "namespace": "",
+      "jobs": [],
+      "rule_signals": [],
+      "invalid_types": []
+    },
+    {
+      "metric_name": "order_legacy_latency_seconds",
+      "series_count": 1,
+      "label_keys": [
+        "service"
+      ],
+      "label_cardinality": {
+        "service": 1
+      },
+      "sample_label_values": {
+        "service": [
+          "order-api"
+        ]
+      },
+      "owner": "orders-team",
+      "service": "order-api",
+      "namespace": "orders",
+      "jobs": [],
+      "rule_signals": [
+        "metric:deprecated"
+      ],
+      "invalid_types": [
+        "deprecated_metric"
+      ]
+    },
+    {
+      "metric_name": "process_cpu_seconds_total",
+      "series_count": 1,
+      "label_keys": [],
+      "label_cardinality": {},
+      "sample_label_values": {},
+      "owner": "",
+      "service": "",
+      "namespace": "",
+      "jobs": [],
+      "rule_signals": [],
+      "invalid_types": []
+    },
+    {
+      "metric_name": "queue_depth",
+      "series_count": 1,
+      "label_keys": [
+        "env",
+        "service"
+      ],
+      "label_cardinality": {
+        "env": 1,
+        "service": 1
+      },
+      "sample_label_values": {
+        "env": [
+          ""
+        ],
+        "service": [
+          "order-api"
+        ]
+      },
+      "owner": "orders-team",
+      "service": "order-api",
+      "namespace": "orders",
+      "jobs": [],
+      "rule_signals": [
+        "label:env:empty_value"
+      ],
+      "invalid_types": [
+        "empty_label_value"
+      ]
+    }
+  ]
+}

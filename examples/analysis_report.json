@@ -1,0 +1,523 @@
+{
+  "schema_version": "v1",
+  "scan_id": "20260609T020105Z-scan",
+  "scan_time": "2026-06-09T02:01:05Z",
+  "tool_version": "0.1.0",
+  "config_hash": "sha256:2b485520da1e4a3ff00e4cea3a206aa8bc8c92827f59398938d3819dc9bd3823",
+  "source": {
+    "source_type": "file",
+    "input_ref": "fixtures/demo_metrics.prom",
+    "prom_url": "",
+    "scan_scope": "all",
+    "series_count": 16,
+    "metric_name_count": 11
+  },
+  "ai": {
+    "provider": "deepseek",
+    "model": "deepseek-v4-flash",
+    "base_url": "https://api.deepseek.com",
+    "ai_mode": "local_rules",
+    "ai_scope": "all",
+    "enabled": false,
+    "status": "disabled",
+    "fallback_reason": "",
+    "analysis_method": "disabled",
+    "attempt_count": 0,
+    "fallback_used": false,
+    "redaction_enabled": true,
+    "analyzed_metric_count": 0,
+    "summary": "Local rule analysis: 7 invalid metric(s).",
+    "historical_comparison_summary": "",
+    "config_hash": "sha256:723d0718dc5bc78a08aca18d24e41651f8883bc96a6240e07274bbad7593d69d"
+  },
+  "summary": {
+    "total_series": 16,
+    "total_metric_names": 11,
+    "valid_metric_names": 4,
+    "invalid_metric_names": 7,
+    "invalid_ratio": 0.6364,
+    "risk_distribution": {
+      "minor": 2,
+      "severe": 1,
+      "warning": 4
+    },
+    "invalid_type_counts": {
+      "deprecated_metric": 1,
+      "duplicate_metric": 1,
+      "empty_label_value": 1,
+      "high_cardinality": 1,
+      "invalid_label_name": 1,
+      "meaningless_metric": 1,
+      "orphan_metric": 1
+    },
+    "storage_impact": {
+      "high_impact_metrics": 0,
+      "medium_impact_metrics": 0,
+      "low_impact_metrics": 7,
+      "estimated_invalid_series": 10,
+      "estimated_invalid_index_entries": 40,
+      "top_storage_impact_metrics": [
+        {
+          "metric_name": "http_user_requests_total",
+          "estimated_index_entries": 13,
+          "impact_level": "low"
+        },
+        {
+          "metric_name": "dup_orders_total",
+          "estimated_index_entries": 8,
+          "impact_level": "low"
+        },
+        {
+          "metric_name": "cache_hits_total",
+          "estimated_index_entries": 5,
+          "impact_level": "low"
+        },
+        {
+          "metric_name": "queue_depth",
+          "estimated_index_entries": 5,
+          "impact_level": "low"
+        },
+        {
+          "metric_name": "debug_trace_count",
+          "estimated_index_entries": 3,
+          "impact_level": "low"
+        }
+      ],
+      "heuristic": "estimated_index_entries is a heuristic proxy for inverted-index postings, not real TSDB bytes; no disk-size guarantee.",
+      "scope_note": "computed for invalid metrics only; valid-metric storage impact is out of scope (analysis_report.json does not retain full valid-metric detail)."
+    }
+  },
+  "invalid_metrics": [
+    {
+      "metric_name": "cache_hits_total",
+      "is_invalid": true,
+      "invalid_types": [
+        "invalid_label_name"
+      ],
+      "risk_level": "warning",
+      "risk_score": 60,
+      "confidence": 1,
+      "rule_signals": [
+        "label:route:path:invalid_name"
+      ],
+      "root_cause": "Label name violates the Prometheus naming convention.",
+      "recommendations": [
+        "Rename the label to match [a-zA-Z_][a-zA-Z0-9_]*.",
+        "Drop the non-conforming label via metric_relabel_configs."
+      ],
+      "owner": "orders-team",
+      "service": "order-api",
+      "namespace": "orders",
+      "series_count": 1,
+      "label_cardinality": {
+        "route:path": 1,
+        "service": 1
+      },
+      "relabel_candidate": true,
+      "analysis_sources": [
+        "local_rules"
+      ],
+      "storage_impact": {
+        "series_count": 1,
+        "label_count": 2,
+        "max_label_cardinality": 1,
+        "top_cardinality_labels": [
+          {
+            "label_key": "route:path",
+            "cardinality": 1
+          },
+          {
+            "label_key": "service",
+            "cardinality": 1
+          }
+        ],
+        "estimated_index_entries": 5,
+        "impact_level": "low",
+        "reason": "low estimated storage impact (≈5 index entries, max label cardinality 1)"
+      }
+    },
+    {
+      "metric_name": "debug_trace_count",
+      "is_invalid": true,
+      "invalid_types": [
+        "meaningless_metric"
+      ],
+      "risk_level": "minor",
+      "risk_score": 30,
+      "confidence": 1,
+      "rule_signals": [
+        "metric:meaningless"
+      ],
+      "root_cause": "Metric name matches a debug/test/temp pattern.",
+      "recommendations": [
+        "Remove debug/test metrics from production exposition.",
+        "Gate temporary metrics behind a flag."
+      ],
+      "owner": "orders-team",
+      "service": "order-api",
+      "namespace": "orders",
+      "series_count": 1,
+      "label_cardinality": {
+        "service": 1
+      },
+      "relabel_candidate": true,
+      "analysis_sources": [
+        "local_rules"
+      ],
+      "storage_impact": {
+        "series_count": 1,
+        "label_count": 1,
+        "max_label_cardinality": 1,
+        "top_cardinality_labels": [
+          {
+            "label_key": "service",
+            "cardinality": 1
+          }
+        ],
+        "estimated_index_entries": 3,
+        "impact_level": "low",
+        "reason": "low estimated storage impact (≈3 index entries, max label cardinality 1)"
+      }
+    },
+    {
+      "metric_name": "dup_orders_total",
+      "is_invalid": true,
+      "invalid_types": [
+        "duplicate_metric"
+      ],
+      "risk_level": "warning",
+      "risk_score": 55,
+      "confidence": 1,
+      "rule_signals": [
+        "metric:duplicate_series"
+      ],
+      "root_cause": "Duplicate fingerprint: identical metric name and label set reported more than once.",
+      "recommendations": [
+        "Deduplicate the exporter output.",
+        "Check for double scraping or merged jobs producing identical series."
+      ],
+      "owner": "orders-team",
+      "service": "order-api",
+      "namespace": "orders",
+      "series_count": 2,
+      "label_cardinality": {
+        "service": 1,
+        "shard": 1
+      },
+      "relabel_candidate": false,
+      "analysis_sources": [
+        "local_rules"
+      ],
+      "storage_impact": {
+        "series_count": 2,
+        "label_count": 2,
+        "max_label_cardinality": 1,
+        "top_cardinality_labels": [
+          {
+            "label_key": "service",
+            "cardinality": 1
+          },
+          {
+            "label_key": "shard",
+            "cardinality": 1
+          }
+        ],
+        "estimated_index_entries": 8,
+        "impact_level": "low",
+        "reason": "low estimated storage impact (≈8 index entries, max label cardinality 1)"
+      }
+    },
+    {
+      "metric_name": "ghost_exporter_up",
+      "is_invalid": true,
+      "invalid_types": [
+        "orphan_metric"
+      ],
+      "risk_level": "minor",
+      "risk_score": 35,
+      "confidence": 1,
+      "rule_signals": [
+        "service:orphan"
+      ],
+      "root_cause": "Metric's service/job does not resolve to any entry in service_inventory.yaml.",
+      "recommendations": [
+        "Add the service to service_inventory.yaml or fix the job/service label.",
+        "Confirm the owning team and assign remediation."
+      ],
+      "owner": "unknown",
+      "service": "ghost-api",
+      "namespace": "",
+      "series_count": 1,
+      "label_cardinality": {
+        "service": 1
+      },
+      "relabel_candidate": false,
+      "analysis_sources": [
+        "local_rules"
+      ],
+      "storage_impact": {
+        "series_count": 1,
+        "label_count": 1,
+        "max_label_cardinality": 1,
+        "top_cardinality_labels": [
+          {
+            "label_key": "service",
+            "cardinality": 1
+          }
+        ],
+        "estimated_index_entries": 3,
+        "impact_level": "low",
+        "reason": "low estimated storage impact (≈3 index entries, max label cardinality 1)"
+      }
+    },
+    {
+      "metric_name": "http_user_requests_total",
+      "is_invalid": true,
+      "invalid_types": [
+        "high_cardinality"
+      ],
+      "risk_level": "severe",
+      "risk_score": 90,
+      "confidence": 1,
+      "rule_signals": [
+        "label:user_id:high_cardinality"
+      ],
+      "root_cause": "High-cardinality or forbidden label creates unbounded time series.",
+      "recommendations": [
+        "Remove high-cardinality labels (e.g. user_id) from the metric.",
+        "Use logs or tracing for per-entity investigation."
+      ],
+      "owner": "platform-observability",
+      "service": "payment-api",
+      "namespace": "payments",
+      "series_count": 3,
+      "label_cardinality": {
+        "service": 1,
+        "user_id": 3
+      },
+      "relabel_candidate": true,
+      "analysis_sources": [
+        "local_rules"
+      ],
+      "storage_impact": {
+        "series_count": 3,
+        "label_count": 2,
+        "max_label_cardinality": 3,
+        "top_cardinality_labels": [
+          {
+            "label_key": "user_id",
+            "cardinality": 3
+          },
+          {
+            "label_key": "service",
+            "cardinality": 1
+          }
+        ],
+        "estimated_index_entries": 13,
+        "impact_level": "low",
+        "reason": "low estimated storage impact (≈13 index entries, max label cardinality 3)"
+      }
+    },
+    {
+      "metric_name": "order_legacy_latency_seconds",
+      "is_invalid": true,
+      "invalid_types": [
+        "deprecated_metric"
+      ],
+      "risk_level": "warning",
+      "risk_score": 50,
+      "confidence": 1,
+      "rule_signals": [
+        "metric:deprecated"
+      ],
+      "root_cause": "Metric name matches a deprecated/legacy naming pattern.",
+      "recommendations": [
+        "Confirm the metric is unused and remove the instrumentation.",
+        "Add a metric_relabel drop rule if removal is delayed."
+      ],
+      "owner": "orders-team",
+      "service": "order-api",
+      "namespace": "orders",
+      "series_count": 1,
+      "label_cardinality": {
+        "service": 1
+      },
+      "relabel_candidate": true,
+      "analysis_sources": [
+        "local_rules"
+      ],
+      "storage_impact": {
+        "series_count": 1,
+        "label_count": 1,
+        "max_label_cardinality": 1,
+        "top_cardinality_labels": [
+          {
+            "label_key": "service",
+            "cardinality": 1
+          }
+        ],
+        "estimated_index_entries": 3,
+        "impact_level": "low",
+        "reason": "low estimated storage impact (≈3 index entries, max label cardinality 1)"
+      }
+    },
+    {
+      "metric_name": "queue_depth",
+      "is_invalid": true,
+      "invalid_types": [
+        "empty_label_value"
+      ],
+      "risk_level": "warning",
+      "risk_score": 55,
+      "confidence": 1,
+      "rule_signals": [
+        "label:env:empty_value"
+      ],
+      "root_cause": "Metric carries a label with an empty value.",
+      "recommendations": [
+        "Stop emitting empty labels at the source.",
+        "Use metric_relabel_configs to drop empty labels."
+      ],
+      "owner": "orders-team",
+      "service": "order-api",
+      "namespace": "orders",
+      "series_count": 1,
+      "label_cardinality": {
+        "env": 1,
+        "service": 1
+      },
+      "relabel_candidate": true,
+      "analysis_sources": [
+        "local_rules"
+      ],
+      "storage_impact": {
+        "series_count": 1,
+        "label_count": 2,
+        "max_label_cardinality": 1,
+        "top_cardinality_labels": [
+          {
+            "label_key": "env",
+            "cardinality": 1
+          },
+          {
+            "label_key": "service",
+            "cardinality": 1
+          }
+        ],
+        "estimated_index_entries": 5,
+        "impact_level": "low",
+        "reason": "low estimated storage impact (≈5 index entries, max label cardinality 1)"
+      }
+    }
+  ],
+  "top_risk_metrics": [
+    {
+      "metric_name": "http_user_requests_total",
+      "risk_level": "severe",
+      "risk_score": 90,
+      "invalid_types": [
+        "high_cardinality"
+      ]
+    },
+    {
+      "metric_name": "cache_hits_total",
+      "risk_level": "warning",
+      "risk_score": 60,
+      "invalid_types": [
+        "invalid_label_name"
+      ]
+    },
+    {
+      "metric_name": "dup_orders_total",
+      "risk_level": "warning",
+      "risk_score": 55,
+      "invalid_types": [
+        "duplicate_metric"
+      ]
+    },
+    {
+      "metric_name": "queue_depth",
+      "risk_level": "warning",
+      "risk_score": 55,
+      "invalid_types": [
+        "empty_label_value"
+      ]
+    },
+    {
+      "metric_name": "order_legacy_latency_seconds",
+      "risk_level": "warning",
+      "risk_score": 50,
+      "invalid_types": [
+        "deprecated_metric"
+      ]
+    },
+    {
+      "metric_name": "ghost_exporter_up",
+      "risk_level": "minor",
+      "risk_score": 35,
+      "invalid_types": [
+        "orphan_metric"
+      ]
+    },
+    {
+      "metric_name": "debug_trace_count",
+      "risk_level": "minor",
+      "risk_score": 30,
+      "invalid_types": [
+        "meaningless_metric"
+      ]
+    }
+  ],
+  "top_violation_labels": [
+    {
+      "label_key": "user_id",
+      "invalid_type": "high_cardinality",
+      "risk_level": "severe",
+      "risk_score": 90,
+      "metric_count": 1,
+      "series_count": 3,
+      "sample_metric_names": [
+        "http_user_requests_total"
+      ]
+    },
+    {
+      "label_key": "route:path",
+      "invalid_type": "invalid_label_name",
+      "risk_level": "warning",
+      "risk_score": 60,
+      "metric_count": 1,
+      "series_count": 1,
+      "sample_metric_names": [
+        "cache_hits_total"
+      ]
+    },
+    {
+      "label_key": "env",
+      "invalid_type": "empty_label_value",
+      "risk_level": "warning",
+      "risk_score": 55,
+      "metric_count": 1,
+      "series_count": 1,
+      "sample_metric_names": [
+        "queue_depth"
+      ]
+    }
+  ],
+  "warnings": [
+    {
+      "line": 39,
+      "raw": "this is not a metric line",
+      "reason": "invalid value \"is\""
+    },
+    {
+      "line": 40,
+      "raw": "http_requests_total{method=} 3",
+      "reason": "expected '\"' for label value"
+    },
+    {
+      "line": 41,
+      "raw": "broken_value{service=\"x\"} not_a_number",
+      "reason": "invalid value \"not_a_number\""
+    }
+  ]
+}
