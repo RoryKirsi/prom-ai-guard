@@ -1,0 +1,153 @@
+schema_version: v1
+generated_from:
+    report: reports/analysis_report.json
+    scan_id: 20260609T052509Z-scan
+dry_run_summary:
+    total_rules: 7
+    by_action:
+        drop: 2
+        labeldrop: 2
+        review: 3
+    labels_dropped:
+        - route:path
+        - user_id
+    metrics_covered: 7
+    estimated_min_affected_series: 6
+    note: Proposal only — never applied by this tool. Apply via GitOps review.
+    scope_warning: labeldrop rules are scrape/metric_relabel-scope-wide; impact is a lower bound estimated from metrics in analysis_report.json only.
+rules:
+    - rule_id: labeldrop_route_path
+      action: labeldrop
+      label_key: route:path
+      invalid_types:
+        - invalid_label_name
+      risk_level: warning
+      reason: 'labeldrop label "route:path": invalid_label_name'
+      affected_metrics:
+        - cache_hits_total
+      application_scope: scrape_config_wide
+      copy_paste_safe: false
+      review_required: true
+      scope_warning: Prometheus labeldrop applies to all matching label names in the scrape/metric relabel scope.
+      expected_impact:
+        triggered_series: 1
+        actual_impact_may_be_larger: true
+        estimate_basis: metrics present in analysis_report.json only
+        storage_reduction_hint: medium
+      metric_relabel_configs:
+        - regex: route:path
+          action: labeldrop
+    - rule_id: labeldrop_user_id
+      action: labeldrop
+      label_key: user_id
+      invalid_types:
+        - high_cardinality
+      risk_level: severe
+      reason: 'labeldrop label "user_id": high_cardinality'
+      affected_metrics:
+        - http_user_requests_total
+      application_scope: scrape_config_wide
+      copy_paste_safe: false
+      review_required: true
+      scope_warning: Prometheus labeldrop applies to all matching label names in the scrape/metric relabel scope.
+      expected_impact:
+        triggered_series: 3
+        actual_impact_may_be_larger: true
+        estimate_basis: metrics present in analysis_report.json only
+        storage_reduction_hint: high
+      metric_relabel_configs:
+        - regex: user_id
+          action: labeldrop
+    - rule_id: drop_metric_debug_trace_count
+      action: drop
+      metric_name: debug_trace_count
+      invalid_types:
+        - meaningless_metric
+      risk_level: minor
+      reason: 'drop metric "debug_trace_count": meaningless_metric'
+      affected_metrics:
+        - debug_trace_count
+      application_scope: metric_scoped
+      copy_paste_safe: true
+      review_required: true
+      scope_warning: ""
+      expected_impact:
+        affected_series: 1
+        storage_reduction_hint: low
+      metric_relabel_configs:
+        - source_labels:
+            - __name__
+          regex: debug_trace_count
+          action: drop
+    - rule_id: drop_metric_order_legacy_latency_seconds
+      action: drop
+      metric_name: order_legacy_latency_seconds
+      invalid_types:
+        - deprecated_metric
+      risk_level: warning
+      reason: 'drop metric "order_legacy_latency_seconds": deprecated_metric'
+      affected_metrics:
+        - order_legacy_latency_seconds
+      application_scope: metric_scoped
+      copy_paste_safe: true
+      review_required: true
+      scope_warning: ""
+      expected_impact:
+        affected_series: 1
+        storage_reduction_hint: medium
+      metric_relabel_configs:
+        - source_labels:
+            - __name__
+          regex: order_legacy_latency_seconds
+          action: drop
+    - rule_id: review_dup_orders_total
+      action: review
+      metric_name: dup_orders_total
+      invalid_types:
+        - duplicate_metric
+      risk_level: warning
+      reason: 'review "dup_orders_total": duplicate_metric — no safe automatic relabel'
+      affected_metrics:
+        - dup_orders_total
+      application_scope: review_only
+      copy_paste_safe: false
+      review_required: true
+      scope_warning: ""
+      expected_impact:
+        triggered_series: 2
+        storage_reduction_hint: medium
+      metric_relabel_configs: []
+    - rule_id: review_ghost_exporter_up
+      action: review
+      metric_name: ghost_exporter_up
+      invalid_types:
+        - orphan_metric
+      risk_level: minor
+      reason: 'review "ghost_exporter_up": orphan_metric — no safe automatic relabel'
+      affected_metrics:
+        - ghost_exporter_up
+      application_scope: review_only
+      copy_paste_safe: false
+      review_required: true
+      scope_warning: ""
+      expected_impact:
+        triggered_series: 1
+        storage_reduction_hint: low
+      metric_relabel_configs: []
+    - rule_id: review_queue_depth
+      action: review
+      metric_name: queue_depth
+      invalid_types:
+        - empty_label_value
+      risk_level: warning
+      reason: 'review "queue_depth": empty_label_value — no safe automatic relabel'
+      affected_metrics:
+        - queue_depth
+      application_scope: review_only
+      copy_paste_safe: false
+      review_required: true
+      scope_warning: ""
+      expected_impact:
+        triggered_series: 1
+        storage_reduction_hint: medium
+      metric_relabel_configs: []
