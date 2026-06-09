@@ -16,19 +16,24 @@
     "provider": "deepseek",
     "model": "deepseek-v4-flash",
     "base_url": "https://api.deepseek.com",
-    "ai_mode": "local_rules",
+    "ai_mode": "llm_fullscan",
     "ai_scope": "all",
-    "enabled": false,
-    "status": "disabled",
+    "enabled": true,
+    "status": "success",
     "fallback_reason": "",
-    "analysis_method": "disabled",
-    "attempt_count": 0,
+    "analysis_method": "llm_fullscan",
+    "attempt_count": 3,
     "fallback_used": false,
     "redaction_enabled": true,
-    "analyzed_metric_count": 0,
-    "summary": "Local rule analysis: 7 invalid metric(s).",
+    "analyzed_metric_count": 11,
+    "summary": "Single metric with an empty label value on 'env' suggests label governance gaps. Prioritize enforcing label hygiene to avoid silent data loss or misinterpretation. Ensure that all mandatory labels are populated or use relabeling to fill defaults.",
     "historical_comparison_summary": "",
-    "config_hash": "sha256:723d0718dc5bc78a08aca18d24e41651f8883bc96a6240e07274bbad7593d69d"
+    "config_hash": "sha256:8a743683d814883f82a9b6a233fdc78893111eda9d0fe8e035d8c151d19d7aff",
+    "governance_summary": "The overall monitoring governance assessment for this batch is concerning. With a maturity grade of D (score 51) and an invalid metric ratio of 63.6%, the observability posture is poor and requires immediate attention. The dominant systemic issue is high cardinality, classified as “severe,” driven by identity labels such as user_id or session_id. This risk alone undermines the stability and cost-efficiency of your Prometheus infrastructure. Additionally, invalid label names, duplicate metrics, and empty label values each represent warn-level issues that erode data quality and reliability. Deprecated, orphan, and meaningless metrics contribute to overall noise, though at lower risk. To remediate, focus first on reducing label cardinality by dropping identity labels or using recording rules. Next, enforce label naming conventions, eliminate duplicates and empty values, and retire deprecated or test metrics. Normalizing the metric inventory by requiring service ownership and validating label budgets will prevent recurrence. A CI gate with policy checks is recommended to enforce these norms at merge time. The majority of risks are warnings, but the single severe cardinality issue must be treated as a top priority to avoid operational degradation.",
+    "llm_in_scope_metric_count": 11,
+    "batch_size": 5,
+    "batch_count": 3,
+    "successful_batches": 3
   },
   "summary": {
     "total_series": 16,
@@ -175,14 +180,13 @@
       ],
       "risk_level": "warning",
       "risk_score": 60,
-      "confidence": 1,
+      "confidence": 0.95,
       "rule_signals": [
         "label:route:path:invalid_name"
       ],
-      "root_cause": "Label name violates the Prometheus naming convention.",
+      "root_cause": "Misconfiguration in metric instrumentation using colon in label name.",
       "recommendations": [
-        "Rename the label to match [a-zA-Z_][a-zA-Z0-9_]*.",
-        "Drop the non-conforming label via metric_relabel_configs."
+        "Rename label 'route:path' to 'route_path' to comply with Prometheus label naming rules."
       ],
       "owner": "orders-team",
       "service": "order-api",
@@ -193,8 +197,10 @@
         "service": 1
       },
       "relabel_candidate": true,
+      "risk_reason": "Label name 'route:path' contains colon, which is not a valid Prometheus label identifier.",
       "analysis_sources": [
-        "local_rules"
+        "local_rules",
+        "llm"
       ],
       "storage_impact": {
         "series_count": 1,
@@ -223,14 +229,13 @@
       ],
       "risk_level": "minor",
       "risk_score": 30,
-      "confidence": 1,
+      "confidence": 0.9,
       "rule_signals": [
         "metric:meaningless"
       ],
-      "root_cause": "Metric name matches a debug/test/temp pattern.",
+      "root_cause": "Leftover debug metric or unused instrumentation.",
       "recommendations": [
-        "Remove debug/test metrics from production exposition.",
-        "Gate temporary metrics behind a flag."
+        "Remove if not needed, or convert to a toggle-able debug endpoint."
       ],
       "owner": "orders-team",
       "service": "order-api",
@@ -240,8 +245,10 @@
         "service": 1
       },
       "relabel_candidate": true,
+      "risk_reason": "Metric 'debug_trace_count' with single series offers no diagnostic value and clutters the metric namespace.",
       "analysis_sources": [
-        "local_rules"
+        "local_rules",
+        "llm"
       ],
       "storage_impact": {
         "series_count": 1,
@@ -266,14 +273,13 @@
       ],
       "risk_level": "warning",
       "risk_score": 55,
-      "confidence": 1,
+      "confidence": 0.9,
       "rule_signals": [
         "metric:duplicate_series"
       ],
-      "root_cause": "Duplicate fingerprint: identical metric name and label set reported more than once.",
+      "root_cause": "Multiple scrapes of same endpoints or misconfigured exporters emitting duplicate data.",
       "recommendations": [
-        "Deduplicate the exporter output.",
-        "Check for double scraping or merged jobs producing identical series."
+        "Investigate sources emitting duplicate series; deduplicate or drop duplicates via relabeling."
       ],
       "owner": "orders-team",
       "service": "order-api",
@@ -284,8 +290,10 @@
         "shard": 1
       },
       "relabel_candidate": false,
+      "risk_reason": "Duplicate series detected: two identical label sets produce the same metric, causing ingestion overhead and potential data inconsistency.",
       "analysis_sources": [
-        "local_rules"
+        "local_rules",
+        "llm"
       ],
       "storage_impact": {
         "series_count": 2,
@@ -314,14 +322,13 @@
       ],
       "risk_level": "minor",
       "risk_score": 35,
-      "confidence": 1,
+      "confidence": 0.85,
       "rule_signals": [
         "service:orphan"
       ],
-      "root_cause": "Metric's service/job does not resolve to any entry in service_inventory.yaml.",
+      "root_cause": "Service decommission without cleaning up associated metrics.",
       "recommendations": [
-        "Add the service to service_inventory.yaml or fix the job/service label.",
-        "Confirm the owning team and assign remediation."
+        "Remove metric if service is decommissioned; or verify its purpose."
       ],
       "owner": "unknown",
       "service": "ghost-api",
@@ -331,8 +338,10 @@
         "service": 1
       },
       "relabel_candidate": false,
+      "risk_reason": "Metric originates from service 'ghost-api' which appears to be decommissioned or not actively scraped.",
       "analysis_sources": [
-        "local_rules"
+        "local_rules",
+        "llm"
       ],
       "storage_impact": {
         "series_count": 1,
@@ -357,14 +366,15 @@
       ],
       "risk_level": "severe",
       "risk_score": 90,
-      "confidence": 1,
+      "confidence": 0.98,
       "rule_signals": [
         "label:user_id:high_cardinality"
       ],
-      "root_cause": "High-cardinality or forbidden label creates unbounded time series.",
+      "root_cause": "Per-user metrics without aggregation; each user creates new series.",
       "recommendations": [
-        "Remove high-cardinality labels (e.g. user_id) from the metric.",
-        "Use logs or tracing for per-entity investigation.",
+        "Aggregate user metrics by user segment or remove user_id label if not essential",
+        "Implement label whitelisting to prevent unbounded cardinality",
+        "Consider using summary/histogram for latency instead of per-user counter",
         "TSDB storage optimization: reduce label \"user_id\" (3 distinct) — ~13 estimated index entries (heuristic); use recording rules or drop high-cardinality labels via metric_relabel_configs."
       ],
       "owner": "platform-observability",
@@ -376,8 +386,10 @@
         "user_id": 3
       },
       "relabel_candidate": true,
+      "risk_reason": "Label 'user_id' has high cardinality potential; currently 3 values but may grow unbounded with user count.",
       "analysis_sources": [
-        "local_rules"
+        "local_rules",
+        "llm"
       ],
       "storage_impact": {
         "series_count": 3,
@@ -406,14 +418,15 @@
       ],
       "risk_level": "warning",
       "risk_score": 50,
-      "confidence": 1,
+      "confidence": 0.95,
       "rule_signals": [
         "metric:deprecated"
       ],
-      "root_cause": "Metric name matches a deprecated/legacy naming pattern.",
+      "root_cause": "Legacy metric from previous instrumentation; not actively used.",
       "recommendations": [
-        "Confirm the metric is unused and remove the instrumentation.",
-        "Add a metric_relabel drop rule if removal is delayed."
+        "Replace with new latency metric (e.g., order_latency_seconds) if still needed",
+        "Remove metric if no consumers exist",
+        "Ensure transition plan and monitoring of new metric"
       ],
       "owner": "orders-team",
       "service": "order-api",
@@ -423,8 +436,10 @@
         "service": 1
       },
       "relabel_candidate": true,
+      "risk_reason": "Metric is marked as deprecated, indicating it should be replaced or removed.",
       "analysis_sources": [
-        "local_rules"
+        "local_rules",
+        "llm"
       ],
       "storage_impact": {
         "series_count": 1,
@@ -449,14 +464,13 @@
       ],
       "risk_level": "warning",
       "risk_score": 55,
-      "confidence": 1,
+      "confidence": 0.95,
       "rule_signals": [
         "label:env:empty_value"
       ],
-      "root_cause": "Metric carries a label with an empty value.",
+      "root_cause": "Misconfiguration or missing environment label during metric emission.",
       "recommendations": [
-        "Stop emitting empty labels at the source.",
-        "Use metric_relabel_configs to drop empty labels."
+        "Enforce non-empty label values for 'env' via instrumentation or relabeling rules; consider dropping the label if it is not needed, or set a default value like 'unknown'."
       ],
       "owner": "orders-team",
       "service": "order-api",
@@ -467,8 +481,10 @@
         "service": 1
       },
       "relabel_candidate": true,
+      "risk_reason": "The label 'env' has an empty value, which can cause confusion in queries and aggregation, and may indicate a configuration error or missing metadata.",
       "analysis_sources": [
-        "local_rules"
+        "local_rules",
+        "llm"
       ],
       "storage_impact": {
         "series_count": 1,
