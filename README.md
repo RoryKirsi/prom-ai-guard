@@ -8,11 +8,56 @@ authoritative; the LLM is advisory (adds/upgrades findings, never downgrades).
 **AI 辅助的 Prometheus 无效指标治理** —— 确定性本地规则为权威；LLM 仅为辅助（只新增 / 升级
 发现，绝不降级）。
 
+7 invalid-metric types · provider-neutral LLM (advisory) · governance assessment · storage-impact heuristic · CI/CD gate · relabel proposals · history diff · Docker + Helm
+
 [中文](#中文) | [English](#english)
 
 ---
 
+## 架构 / Architecture
+
+```mermaid
+flowchart LR
+  F["Local text file"] --> PARSE["Parser → MetricSeries"]
+  P["Prometheus HTTP API<br/>read-only, metadata"] --> PARSE
+  PARSE --> TSDB["TSDB label model"]
+  TSDB --> RULES["Deterministic rules<br/>7 invalid types + risk score"]
+  RULES --> RED["Redact → MetricProfile"]
+  RED -. "redacted, batched" .-> LLM["LLM FullScan<br/>(llm_fullscan)"]
+  RULES --> MERGE["Merge<br/>add/upgrade, never downgrade"]
+  LLM -. advisory .-> MERGE
+  MERGE --> GOV["Governance assessment<br/>deterministic + ai.governance_summary"]
+  MERGE --> STORE["Storage-impact heuristic"]
+  MERGE --> REP["Reports: JSON / Markdown / Excel"]
+  GOV --> REP
+  STORE --> REP
+  REP --> LOG["scan.log.jsonl (audit)"]
+  REP --> GATE["gate / relabel / diff / doctor"]
+```
+
+Deterministic stages are authoritative; the LLM only enriches the redacted profiles and
+the governance narrative. 确定性阶段为权威；LLM 仅对脱敏画像与治理叙述做增强。
+
+---
+
 ## 中文
+
+<details><summary>目录</summary>
+
+- [项目概览](#项目概览)
+- [解决的问题](#解决的问题)
+- [已交付功能](#已交付功能)
+- [安装](#安装)
+- [快速开始：本地文件扫描](#快速开始本地文件扫描)
+- [Prometheus API 扫描](#prometheus-api-扫描)
+- [LLM 配置](#llm-配置)
+- [报告产物](#报告产物)
+- [Docker](#docker)
+- [Helm](#helm)
+- [安全边界](#安全边界)
+- [K3s 冒烟结果](#k3s-冒烟结果)
+
+</details>
 
 `prom-ai-guard` 是一个用于 **Prometheus 无效指标治理** 的 Go CLI：扫描本地 Prometheus
 文本文件或只读 Prometheus HTTP API，用确定性规则引擎识别无效 / 高成本指标，可选地用
@@ -283,6 +328,22 @@ helm install pag charts/prom-ai-guard -n prom-ai-guard -f values-prom.yaml
 ---
 
 ## English
+
+<details><summary>Contents</summary>
+
+- [What problem it solves](#what-problem-it-solves)
+- [Features](#features)
+- [Install](#install)
+- [Quickstart — local file scan](#quickstart--local-file-scan)
+- [Prometheus API scan](#prometheus-api-scan)
+- [LLM configuration](#llm-configuration)
+- [Report artifacts](#report-artifacts)
+- [Docker](#docker-1)
+- [Helm](#helm-1)
+- [Security boundaries](#security-boundaries)
+- [K3s smoke-test summary](#k3s-smoke-test-summary)
+
+</details>
 
 A Go CLI for **AI-assisted Prometheus invalid-metric governance**. It scans a local
 Prometheus text file or a read-only Prometheus HTTP API, flags invalid / high-cost
