@@ -64,6 +64,17 @@ type Event struct {
 	ReportPath string `json:"report_path,omitempty"`
 	Artifact   string `json:"artifact,omitempty"`
 	ExitCode   *int   `json:"exit_code,omitempty"`
+
+	// Per-metric classification (metric_classified event). Safe metadata only:
+	// metric_name + invalid_types + risk + rule_signals (label KEYS / rule tags,
+	// never raw label VALUES) + analysis_sources. All of these already appear in
+	// analysis_report.json.
+	MetricName      string   `json:"metric_name,omitempty"`
+	InvalidTypes    []string `json:"invalid_types,omitempty"`
+	RiskLevel       string   `json:"risk_level,omitempty"`
+	RiskScore       *int     `json:"risk_score,omitempty"`
+	RuleSignals     []string `json:"rule_signals,omitempty"`
+	AnalysisSources []string `json:"analysis_sources,omitempty"`
 }
 
 // Logger writes one JSON object per line. A nil *Logger is a valid no-op, so the
@@ -200,4 +211,13 @@ func (l *Logger) ScanCompleted(invalidCount int, risk map[string]int, ratio floa
 
 func (l *Logger) ScanFailed(reason string) {
 	l.emit(LevelError, "scan_failed", Event{Reason: sanitizeReason(reason), ExitCode: intp(1)})
+}
+
+// MetricClassified records how one invalid metric was labelled, for review/replay.
+// Safe metadata only — never raw label values (rule_signals carry label keys/tags).
+func (l *Logger) MetricClassified(metricName string, invalidTypes []string, riskLevel string, riskScore int, ruleSignals, analysisSources []string) {
+	l.emit(LevelInfo, "metric_classified", Event{
+		MetricName: metricName, InvalidTypes: invalidTypes, RiskLevel: riskLevel,
+		RiskScore: intp(riskScore), RuleSignals: ruleSignals, AnalysisSources: analysisSources,
+	})
 }

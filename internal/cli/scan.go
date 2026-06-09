@@ -269,6 +269,12 @@ func runScan(cmd *cobra.Command, opts *scanOptions) (err error) {
 	govAssessment := governance.Assess(result.InvalidMetrics, result.Summary.InvalidRatio, &storageSummary)
 	result.Summary.GovernanceAssessment = &govAssessment
 
+	// Per-metric classification trail for review/replay (one safe event per invalid
+	// metric, reflecting the final rules+AI labelling). Mirrors invalid_metrics[].
+	for _, m := range result.InvalidMetrics {
+		alog.MetricClassified(m.MetricName, m.InvalidTypes, m.RiskLevel, m.RiskScore, m.RuleSignals, m.AnalysisSources)
+	}
+
 	aiInfo := aiResult.Info
 	rep := report.Report{
 		SchemaVersion: "v1",
