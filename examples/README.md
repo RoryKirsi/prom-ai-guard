@@ -1,4 +1,35 @@
-# Example report
+# 示例报告 / Example report
+
+## 中文
+
+由 `prom-ai-guard` 真实生成的产物（非手写），输入为 `fixtures/demo_metrics.prom`（刻意覆盖全部 7
+类无效指标）。本示例使用真实 LLM（`--ai-mode llm_fullscan`）生成：
+
+```bash
+export LLM_API_KEY=...   # 你的 provider key
+prom-ai-guard scan \
+  --input fixtures/demo_metrics.prom \
+  --config configs \
+  --out examples \
+  --ai-mode llm_fullscan --ai-scope all --ai-batch-size 5
+```
+
+| 文件 | 说明 |
+|---|---|
+| `analysis_report.json` | 机器契约。`summary` 含 `storage_impact` 与确定性 `governance_assessment`；`ai` 块（`status: success`）含 LLM 增强发现（`root_cause`、`recommendations`、`analysis_sources: ["local_rules","llm"]`）与整批 `ai.governance_summary`。 |
+| `analysis_report.md` | 人类可读 Markdown（含 Governance assessment 与 AI 叙述）。 |
+| `analysis_report.xlsx` | Excel 报告（含 `Governance` 工作表）。 |
+| `ai_input_preview.json` | 实际发给 LLM 的**脱敏**画像。 |
+| `scan.log.jsonl` | 审计日志：扫描生命周期 **+ 每个无效指标一条 `metric_classified`**。 |
+
+说明：
+- LLM 输出**非确定性**（每次措辞不同），故本示例为快照。用 `--ai-mode local_rules`（无需 key）可得
+  完全可复现的确定性报告——`governance_assessment` 相同，仅 `ai.*` 不同。
+- 这些文件中绝不持久化 API key、原始标签值、prompt 或响应。
+
+---
+
+## English
 
 Real artifacts produced by `prom-ai-guard` (not hand-written) from
 `fixtures/demo_metrics.prom`, which intentionally covers all 7 invalid metric types.
