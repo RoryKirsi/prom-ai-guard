@@ -69,10 +69,13 @@ func runScanCmd(t *testing.T, args ...string) (string, error) {
 }
 
 type aiBlock struct {
-	Status         string `json:"status"`
-	Enabled        bool   `json:"enabled"`
-	FallbackReason string `json:"fallback_reason"`
-	ConfigHash     string `json:"config_hash"`
+	Status              string `json:"status"`
+	Enabled             bool   `json:"enabled"`
+	FallbackReason      string `json:"fallback_reason"`
+	ConfigHash          string `json:"config_hash"`
+	FallbackUsed        bool   `json:"fallback_used"`
+	AnalyzedMetricCount int    `json:"analyzed_metric_count"`
+	GovernanceSummary   string `json:"governance_summary"`
 }
 
 func readAIBlock(t *testing.T, outDir string) aiBlock {

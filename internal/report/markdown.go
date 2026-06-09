@@ -178,6 +178,12 @@ func renderGovernance(b *strings.Builder, r Report) {
 		}
 		b.WriteString("\n")
 	}
+	// Slice 17: advisory whole-batch AI narrative (the deterministic data above is
+	// authoritative).
+	if r.AI != nil && strings.TrimSpace(r.AI.GovernanceSummary) != "" {
+		b.WriteString("### AI governance narrative (advisory)\n\n")
+		fmt.Fprintf(b, "> %s\n\n", r.AI.GovernanceSummary)
+	}
 }
 
 func renderInvalidMetric(b *strings.Builder, m model.MetricAnalysis) {

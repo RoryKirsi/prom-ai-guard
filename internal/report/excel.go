@@ -264,6 +264,9 @@ func writeGovernanceSheet(f *excelize.File, st xlStyles, r Report) error {
 	for _, n := range ga.RecommendedNorms {
 		put("recommended_norm", n)
 	}
+	if r.AI != nil && r.AI.GovernanceSummary != "" {
+		put("ai_governance_summary", r.AI.GovernanceSummary)
+	}
 	return nil
 }
 

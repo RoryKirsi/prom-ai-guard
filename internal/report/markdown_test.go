@@ -27,6 +27,7 @@ func sampleReport() Report {
 			AIMode: "llm_fullscan", AIScope: "all", Enabled: true, Status: "success",
 			AnalysisMethod: "llm_fullscan", AttemptCount: 1, AnalyzedMetricCount: 11,
 			Summary: "AI advisory summary text.", ConfigHash: "sha256:ai",
+			GovernanceSummary: "Whole-batch advisory: grade D; high cardinality dominates.",
 		},
 		Summary: scan.Summary{
 			TotalSeries: 16, TotalMetricNames: 11, ValidMetricNames: 4, InvalidMetricNames: 7,
@@ -98,6 +99,7 @@ func TestRenderMarkdownHasRequiredSections(t *testing.T) {
 		"### Top systemic issues",
 		"### Prioritized actions",
 		"### Recommended governance norms",
+		"### AI governance narrative (advisory)",
 		"## Parse warnings",
 		"## Report files",
 	} {

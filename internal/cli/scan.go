@@ -276,6 +276,21 @@ func runScan(cmd *cobra.Command, opts *scanOptions) (err error) {
 	}
 
 	aiInfo := aiResult.Info
+
+	// Slice 17: one final LLM call synthesizing an advisory WHOLE-BATCH governance
+	// narrative from the aggregated deterministic data (safe aggregates only). It is
+	// independent of metric classification: a failure leaves governance_summary empty
+	// and never changes ai.status / fallback_used / analyzed_metric_count.
+	if opts.aiMode == ai.ModeLLMFullScan && completer != nil && apiKey != "" && len(result.InvalidMetrics) > 0 {
+		gs, gerr := ai.SynthesizeGovernance(cmd.Context(), completer, ai.GovernanceSynthesisInput{
+			Assessment:        govAssessment,
+			InvalidTypeCounts: result.Summary.InvalidTypeCounts,
+		}, aiCfg.MaxAttempts)
+		if gerr == nil {
+			aiInfo.GovernanceSummary = gs
+		}
+	}
+
 	rep := report.Report{
 		SchemaVersion: "v1",
 		ScanID:        scanID,

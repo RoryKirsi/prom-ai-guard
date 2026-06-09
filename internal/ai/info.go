@@ -67,6 +67,12 @@ type Info struct {
 	HistoricalComparisonSummary string `json:"historical_comparison_summary"`
 	ConfigHash                  string `json:"config_hash"`
 
+	// Slice 17: advisory whole-batch governance narrative, synthesized by one final
+	// LLM call over the AGGREGATED deterministic governance data (not raw profiles).
+	// Optional and additive; empty on synthesis failure or non-LLM runs. The
+	// authoritative assessment remains summary.governance_assessment.
+	GovernanceSummary string `json:"governance_summary,omitempty"`
+
 	// Slice 14 FullScan batching metadata (omitted for disabled/no-key paths).
 	// PartialFallbackUsed is true when some LLM batches failed (their metrics used
 	// the deterministic baseline) while others succeeded; FallbackUsed stays true
