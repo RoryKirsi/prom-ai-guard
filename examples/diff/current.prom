@@ -1,0 +1,5 @@
+# Snapshot T2: legacy_orders_total now also carries a forbidden user_id label
+# (deprecated -> deprecated + high_cardinality), http_requests_total was cleaned up,
+# and a new debug metric appeared.
+legacy_orders_total{service="order-api",user_id="u1"} 5
+debug_buffer_size{service="order-api"} 3

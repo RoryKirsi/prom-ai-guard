@@ -1,0 +1,3 @@
+# Snapshot T1
+legacy_orders_total{service="order-api"} 5
+http_requests_total{service="order-api",user_id="u1"} 1

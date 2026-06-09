@@ -22,6 +22,8 @@ prom-ai-guard scan \
 | `ai_input_preview.json` | 实际发给 LLM 的**脱敏**画像。 |
 | `scan.log.jsonl` | 审计日志：扫描生命周期 **+ 每个无效指标一条 `metric_classified`**。 |
 
+另见 **[diff/](diff/)** —— 历史对比（`diff`）示例：两次扫描的无效指标变化（新增 / 已解决 / 风险上升 / 类型变化）。
+
 说明：
 - LLM 输出**非确定性**（每次措辞不同），故本示例为快照。用 `--ai-mode local_rules`（无需 key）可得
   完全可复现的确定性报告——`governance_assessment` 相同，仅 `ai.*` 不同。
@@ -51,6 +53,9 @@ prom-ai-guard scan \
 | `analysis_report.xlsx` | Excel report (incl. the `Governance` sheet). |
 | `ai_input_preview.json` | The exact **redacted** profiles sent to the LLM. |
 | `scan.log.jsonl` | Audit log: scan lifecycle **+ one `metric_classified` event per invalid metric**. |
+
+See also **[diff/](diff/)** — a history-diff (`diff`) example: how invalid metrics change between
+two scans (added / resolved / risk increased / type changes).
 
 Notes:
 - LLM output is **non-deterministic** (wording differs per run), so this sample is a

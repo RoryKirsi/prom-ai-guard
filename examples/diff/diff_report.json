@@ -1,0 +1,130 @@
+{
+  "schema_version": "v1",
+  "previous": {
+    "scan_id": "20260609T051128Z-scan",
+    "scan_time": "2026-06-09T05:11:28Z",
+    "tool_version": "0.1.0",
+    "config_hash": "sha256:2b485520da1e4a3ff00e4cea3a206aa8bc8c92827f59398938d3819dc9bd3823",
+    "source_type": "file"
+  },
+  "current": {
+    "scan_id": "20260609T051129Z-scan",
+    "scan_time": "2026-06-09T05:11:29Z",
+    "tool_version": "0.1.0",
+    "config_hash": "sha256:2b485520da1e4a3ff00e4cea3a206aa8bc8c92827f59398938d3819dc9bd3823",
+    "source_type": "file"
+  },
+  "config_changed": false,
+  "summary_delta": {
+    "invalid_metric_names": {
+      "previous": 2,
+      "current": 2,
+      "change": 0
+    },
+    "total_metric_names": {
+      "previous": 2,
+      "current": 2,
+      "change": 0
+    },
+    "severe": {
+      "previous": 1,
+      "current": 1,
+      "change": 0
+    },
+    "warning": {
+      "previous": 1,
+      "current": 0,
+      "change": -1
+    },
+    "minor": {
+      "previous": 0,
+      "current": 1,
+      "change": 1
+    },
+    "invalid_ratio": {
+      "previous": 1,
+      "current": 1,
+      "change": 0
+    }
+  },
+  "added_invalid": [
+    {
+      "metric_name": "debug_buffer_size",
+      "previous_risk_level": "",
+      "current_risk_level": "minor",
+      "previous_risk_score": 0,
+      "current_risk_score": 30,
+      "previous_invalid_types": null,
+      "current_invalid_types": [
+        "meaningless_metric"
+      ],
+      "owner": "orders-team",
+      "service": "order-api",
+      "namespace": "orders"
+    }
+  ],
+  "resolved_invalid": [
+    {
+      "metric_name": "http_requests_total",
+      "previous_risk_level": "severe",
+      "current_risk_level": "",
+      "previous_risk_score": 90,
+      "current_risk_score": 0,
+      "previous_invalid_types": [
+        "high_cardinality"
+      ],
+      "current_invalid_types": null,
+      "owner": "orders-team",
+      "service": "order-api",
+      "namespace": "orders"
+    }
+  ],
+  "still_invalid": [
+    {
+      "metric_name": "legacy_orders_total",
+      "previous_risk_level": "warning",
+      "current_risk_level": "severe",
+      "previous_risk_score": 50,
+      "current_risk_score": 95,
+      "previous_invalid_types": [
+        "deprecated_metric"
+      ],
+      "current_invalid_types": [
+        "deprecated_metric",
+        "high_cardinality"
+      ],
+      "owner": "orders-team",
+      "service": "order-api",
+      "namespace": "orders"
+    }
+  ],
+  "risk_increased": [
+    {
+      "metric_name": "legacy_orders_total",
+      "previous_risk_level": "warning",
+      "current_risk_level": "severe",
+      "previous_risk_score": 50,
+      "current_risk_score": 95,
+      "previous_invalid_types": [
+        "deprecated_metric"
+      ],
+      "current_invalid_types": [
+        "deprecated_metric",
+        "high_cardinality"
+      ],
+      "owner": "orders-team",
+      "service": "order-api",
+      "namespace": "orders"
+    }
+  ],
+  "risk_decreased": [],
+  "type_changes": [
+    {
+      "metric_name": "legacy_orders_total",
+      "added_types": [
+        "high_cardinality"
+      ],
+      "removed_types": null
+    }
+  ]
+}
