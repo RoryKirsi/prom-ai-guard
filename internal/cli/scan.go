@@ -11,6 +11,7 @@ import (
 	"prom-ai-guard/internal/ai"
 	"prom-ai-guard/internal/auditlog"
 	"prom-ai-guard/internal/config"
+	"prom-ai-guard/internal/governance"
 	"prom-ai-guard/internal/model"
 	"prom-ai-guard/internal/parser"
 	"prom-ai-guard/internal/profile"
@@ -262,6 +263,11 @@ func runScan(cmd *cobra.Command, opts *scanOptions) (err error) {
 		MediumLabelCardinality: rulesCfg.StorageImpact.MediumLabelCardinality,
 	})
 	result.Summary.StorageImpact = &storageSummary
+
+	// Slice 16: deterministic batch-level governance assessment (always present,
+	// including local_rules and fallback runs). Nested under summary.
+	govAssessment := governance.Assess(result.InvalidMetrics, result.Summary.InvalidRatio, &storageSummary)
+	result.Summary.GovernanceAssessment = &govAssessment
 
 	aiInfo := aiResult.Info
 	rep := report.Report{

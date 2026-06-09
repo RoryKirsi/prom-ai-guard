@@ -90,6 +90,12 @@ Respond with JSON ONLY, no markdown, in exactly this shape:
 Rules:
 - is_invalid=false means the metric is acceptable; omit invalid_types.
 - is_invalid=true requires at least one valid invalid_types value.
-- recommendations must be concrete (metric cleanup, relabel/labeldrop, label governance).
+- recommendations must be concrete (metric cleanup, duplicate merge, label
+  governance, relabel/labeldrop, TSDB storage optimization).
+- "summary" is an OVERALL monitoring-governance assessment of the whole batch:
+  name the systemic issues (e.g. service decommission not cleaned, label abuse,
+  log-to-metric sprawl, architecture-iteration leftovers, config error) and the
+  prioritized governance actions. It is advisory narrative only — the
+  deterministic governance_assessment in the report is authoritative.
 - Output the metric_name exactly as given.`
 }

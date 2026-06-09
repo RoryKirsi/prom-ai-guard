@@ -1,7 +1,7 @@
 {
   "schema_version": "v1",
-  "scan_id": "20260609T020105Z-scan",
-  "scan_time": "2026-06-09T02:01:05Z",
+  "scan_id": "20260609T024948Z-scan",
+  "scan_time": "2026-06-09T02:49:48Z",
   "tool_version": "0.1.0",
   "config_hash": "sha256:2b485520da1e4a3ff00e4cea3a206aa8bc8c92827f59398938d3819dc9bd3823",
   "source": {
@@ -85,6 +85,85 @@
       ],
       "heuristic": "estimated_index_entries is a heuristic proxy for inverted-index postings, not real TSDB bytes; no disk-size guarantee.",
       "scope_note": "computed for invalid metrics only; valid-metric storage impact is out of scope (analysis_report.json does not retain full valid-metric detail)."
+    },
+    "governance_assessment": {
+      "invalid_ratio": 0.6364,
+      "total_invalid": 7,
+      "risk_distribution": {
+        "minor": 2,
+        "severe": 1,
+        "warning": 4
+      },
+      "top_systemic_issues": [
+        {
+          "invalid_type": "high_cardinality",
+          "metric_count": 1,
+          "max_risk": "severe",
+          "max_score": 90
+        },
+        {
+          "invalid_type": "invalid_label_name",
+          "metric_count": 1,
+          "max_risk": "warning",
+          "max_score": 60
+        },
+        {
+          "invalid_type": "duplicate_metric",
+          "metric_count": 1,
+          "max_risk": "warning",
+          "max_score": 55
+        },
+        {
+          "invalid_type": "empty_label_value",
+          "metric_count": 1,
+          "max_risk": "warning",
+          "max_score": 55
+        },
+        {
+          "invalid_type": "deprecated_metric",
+          "metric_count": 1,
+          "max_risk": "warning",
+          "max_score": 50
+        },
+        {
+          "invalid_type": "orphan_metric",
+          "metric_count": 1,
+          "max_risk": "minor",
+          "max_score": 35
+        },
+        {
+          "invalid_type": "meaningless_metric",
+          "metric_count": 1,
+          "max_risk": "minor",
+          "max_score": 30
+        }
+      ],
+      "storage_pressure": {
+        "high_impact_metrics": 0,
+        "medium_impact_metrics": 0,
+        "low_impact_metrics": 7,
+        "estimated_invalid_index_entries": 40
+      },
+      "maturity_score": 51,
+      "maturity_grade": "D",
+      "maturity_heuristic": "Heuristic governance-prioritization signal only — NOT an SLO, compliance score, or production-maturity certification. score = 100 − round(invalid_ratio×40) − 10×severe − 3×warning − 1×minor − 5×high_storage − 2×medium_storage, clamped to 0–100; grade A≥90 B≥75 C≥60 D≥40 F<40.",
+      "prioritized_actions": [
+        "Reduce label cardinality on 1 high-cardinality metric(s): drop identity labels (user_id/session_id/…) or use recording rules / logs.",
+        "Fix 1 metric(s) with non-conforming label names ([a-zA-Z_][a-zA-Z0-9_]*).",
+        "Deduplicate 1 metric(s): merge duplicate series and fix double scraping.",
+        "Stop emitting empty label values on 1 metric(s).",
+        "Remove 1 deprecated/legacy metric(s), or add metric_relabel drop rules until removal.",
+        "Map 1 orphan metric(s) to service_inventory.yaml (assign owner/service).",
+        "Remove 1 debug/test/temp metric(s) from production exposition."
+      ],
+      "recommended_norms": [
+        "Set per-metric label-cardinality budgets; forbid identity labels (user_id/session_id/trace_id/request_id).",
+        "Enforce a metric naming convention; ban deprecated/legacy/debug/test/temp tokens in production.",
+        "Validate label names ([a-zA-Z_][a-zA-Z0-9_]*) and forbid empty label values at instrumentation.",
+        "Prevent duplicate series: one exporter per metric; avoid double scraping / merged jobs.",
+        "Require owner/service labels and map every scrape job in service_inventory.yaml.",
+        "Review the generated relabel_rules.yaml via a GitOps PR before applying; gate CI on policy.yaml."
+      ]
     }
   },
   "invalid_metrics": [
@@ -285,7 +364,8 @@
       "root_cause": "High-cardinality or forbidden label creates unbounded time series.",
       "recommendations": [
         "Remove high-cardinality labels (e.g. user_id) from the metric.",
-        "Use logs or tracing for per-entity investigation."
+        "Use logs or tracing for per-entity investigation.",
+        "TSDB storage optimization: reduce label \"user_id\" (3 distinct) — ~13 estimated index entries (heuristic); use recording rules or drop high-cardinality labels via metric_relabel_configs."
       ],
       "owner": "platform-observability",
       "service": "payment-api",

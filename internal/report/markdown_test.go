@@ -43,6 +43,15 @@ func sampleReport() Report {
 				Heuristic:               "estimated_index_entries is a heuristic proxy for inverted-index postings, not real TSDB bytes; no disk-size guarantee.",
 				ScopeNote:               "computed for invalid metrics only.",
 			},
+			GovernanceAssessment: &model.GovernanceAssessment{
+				InvalidRatio: 0.6364, TotalInvalid: 7,
+				RiskDistribution:  map[string]int{"severe": 1, "warning": 4, "minor": 2},
+				TopSystemicIssues: []model.SystemicIssue{{InvalidType: "high_cardinality", MetricCount: 1, MaxRisk: "severe", MaxScore: 90}},
+				MaturityScore:     51, MaturityGrade: "D",
+				MaturityHeuristic:  "Heuristic governance-prioritization signal only.",
+				PrioritizedActions: []string{"Reduce label cardinality on 1 high-cardinality metric(s)."},
+				RecommendedNorms:   []string{"Review the generated relabel_rules.yaml via a GitOps PR before applying; gate CI on policy.yaml."},
+			},
 		},
 		InvalidMetrics: []model.MetricAnalysis{{
 			MetricName: "http_user_requests_total", IsInvalid: true,
@@ -85,6 +94,10 @@ func TestRenderMarkdownHasRequiredSections(t *testing.T) {
 		"## Top violation labels",
 		"## Invalid metric details",
 		"## Storage impact (heuristic)",
+		"## Governance assessment",
+		"### Top systemic issues",
+		"### Prioritized actions",
+		"### Recommended governance norms",
 		"## Parse warnings",
 		"## Report files",
 	} {

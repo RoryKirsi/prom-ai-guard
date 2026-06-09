@@ -21,7 +21,7 @@ func TestWriteExcelSheetsAndStyling(t *testing.T) {
 	defer f.Close()
 
 	// Exact final sheet names, in order.
-	want := []string{"Summary", "Invalid Metrics", "Top Risk", "Top Violation Labels", "Warnings", "Storage Impact"}
+	want := []string{"Summary", "Invalid Metrics", "Top Risk", "Top Violation Labels", "Warnings", "Storage Impact", "Governance"}
 	if got := f.GetSheetList(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("sheet list = %v, want %v", got, want)
 	}
@@ -64,6 +64,13 @@ func TestWriteExcelSheetsAndStyling(t *testing.T) {
 	if v, _ := f.GetCellValue("Storage Impact", "A2"); v != "http_user_requests_total" {
 		t.Errorf("Storage Impact A2 = %q", v)
 	}
+	// Governance sheet header + maturity row.
+	if v, _ := f.GetCellValue("Governance", "A1"); v != "Field" {
+		t.Errorf("Governance A1 = %q", v)
+	}
+	if v, _ := f.GetCellValue("Governance", "A2"); v != "maturity_grade" {
+		t.Errorf("Governance A2 = %q", v)
+	}
 }
 
 func TestWriteExcelEmptyReport(t *testing.T) {
@@ -83,7 +90,7 @@ func TestWriteExcelEmptyReport(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer f.Close()
-	want := []string{"Summary", "Invalid Metrics", "Top Risk", "Top Violation Labels", "Warnings", "Storage Impact"}
+	want := []string{"Summary", "Invalid Metrics", "Top Risk", "Top Violation Labels", "Warnings", "Storage Impact", "Governance"}
 	if got := f.GetSheetList(); !reflect.DeepEqual(got, want) {
 		t.Errorf("sheet list = %v, want %v", got, want)
 	}

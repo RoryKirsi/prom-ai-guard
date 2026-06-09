@@ -2,8 +2,8 @@
 
 ## Scan
 
-- scan_id: `20260609T020105Z-scan`
-- scan_time: 2026-06-09T02:01:05Z
+- scan_id: `20260609T024948Z-scan`
+- scan_time: 2026-06-09T02:49:48Z
 - tool_version: 0.1.0
 - config_hash: `sha256:2b485520da1e4a3ff00e4cea3a206aa8bc8c92827f59398938d3819dc9bd3823`
 
@@ -121,7 +121,7 @@
 - invalid_types: high_cardinality
 - risk: severe (score 90)
 - root_cause: High-cardinality or forbidden label creates unbounded time series.
-- recommendations: Remove high-cardinality labels (e.g. user_id) from the metric.; Use logs or tracing for per-entity investigation.
+- recommendations: Remove high-cardinality labels (e.g. user_id) from the metric.; Use logs or tracing for per-entity investigation.; TSDB storage optimization: reduce label "user_id" (3 distinct) — ~13 estimated index entries (heuristic); use recording rules or drop high-cardinality labels via metric_relabel_configs.
 - owner/service/namespace: platform-observability / payment-api / payments
 - series_count: 3
 - analysis_sources: local_rules
@@ -167,6 +167,45 @@
 | http_user_requests_total | 3 | 2 | 3 | 13 | low |
 | order_legacy_latency_seconds | 1 | 1 | 1 | 3 | low |
 | queue_depth | 1 | 2 | 1 | 5 | low |
+
+## Governance assessment
+
+- maturity: grade D (score 51) — heuristic
+- invalid_ratio: 0.6364 (total_invalid 7)
+- risk_distribution: severe=1 warning=4 minor=2
+
+> Note: Heuristic governance-prioritization signal only — NOT an SLO, compliance score, or production-maturity certification. score = 100 − round(invalid_ratio×40) − 10×severe − 3×warning − 1×minor − 5×high_storage − 2×medium_storage, clamped to 0–100; grade A≥90 B≥75 C≥60 D≥40 F<40.
+
+### Top systemic issues
+
+| invalid_type | metric_count | max_risk | max_score |
+|---|---|---|---|
+| high_cardinality | 1 | severe | 90 |
+| invalid_label_name | 1 | warning | 60 |
+| duplicate_metric | 1 | warning | 55 |
+| empty_label_value | 1 | warning | 55 |
+| deprecated_metric | 1 | warning | 50 |
+| orphan_metric | 1 | minor | 35 |
+| meaningless_metric | 1 | minor | 30 |
+
+### Prioritized actions
+
+1. Reduce label cardinality on 1 high-cardinality metric(s): drop identity labels (user_id/session_id/…) or use recording rules / logs.
+1. Fix 1 metric(s) with non-conforming label names ([a-zA-Z_][a-zA-Z0-9_]*).
+1. Deduplicate 1 metric(s): merge duplicate series and fix double scraping.
+1. Stop emitting empty label values on 1 metric(s).
+1. Remove 1 deprecated/legacy metric(s), or add metric_relabel drop rules until removal.
+1. Map 1 orphan metric(s) to service_inventory.yaml (assign owner/service).
+1. Remove 1 debug/test/temp metric(s) from production exposition.
+
+### Recommended governance norms
+
+- Set per-metric label-cardinality budgets; forbid identity labels (user_id/session_id/trace_id/request_id).
+- Enforce a metric naming convention; ban deprecated/legacy/debug/test/temp tokens in production.
+- Validate label names ([a-zA-Z_][a-zA-Z0-9_]*) and forbid empty label values at instrumentation.
+- Prevent duplicate series: one exporter per metric; avoid double scraping / merged jobs.
+- Require owner/service labels and map every scrape job in service_inventory.yaml.
+- Review the generated relabel_rules.yaml via a GitOps PR before applying; gate CI on policy.yaml.
 
 ## Parse warnings
 

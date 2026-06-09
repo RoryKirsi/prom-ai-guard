@@ -118,6 +118,9 @@ func RenderMarkdown(r Report) string {
 	// Storage impact (heuristic)
 	renderStorageImpact(&b, r)
 
+	// Governance assessment (deterministic, heuristic)
+	renderGovernance(&b, r)
+
 	// Parse warnings
 	b.WriteString("## Parse warnings\n\n")
 	if len(r.Warnings) == 0 {
@@ -137,6 +140,44 @@ func RenderMarkdown(r Report) string {
 	b.WriteString("- ai_input_preview.json (redacted AI input)\n")
 
 	return b.String()
+}
+
+func renderGovernance(b *strings.Builder, r Report) {
+	b.WriteString("## Governance assessment\n\n")
+	ga := r.Summary.GovernanceAssessment
+	if ga == nil {
+		b.WriteString("_none_\n\n")
+		return
+	}
+	fmt.Fprintf(b, "- maturity: grade %s (score %d) — heuristic\n", ga.MaturityGrade, ga.MaturityScore)
+	fmt.Fprintf(b, "- invalid_ratio: %.4f (total_invalid %d)\n", ga.InvalidRatio, ga.TotalInvalid)
+	fmt.Fprintf(b, "- risk_distribution: severe=%d warning=%d minor=%d\n",
+		ga.RiskDistribution["severe"], ga.RiskDistribution["warning"], ga.RiskDistribution["minor"])
+	fmt.Fprintf(b, "\n> Note: %s\n\n", ga.MaturityHeuristic)
+
+	if len(ga.TopSystemicIssues) > 0 {
+		b.WriteString("### Top systemic issues\n\n")
+		b.WriteString("| invalid_type | metric_count | max_risk | max_score |\n")
+		b.WriteString("|---|---|---|---|\n")
+		for _, s := range ga.TopSystemicIssues {
+			fmt.Fprintf(b, "| %s | %d | %s | %d |\n", s.InvalidType, s.MetricCount, s.MaxRisk, s.MaxScore)
+		}
+		b.WriteString("\n")
+	}
+	if len(ga.PrioritizedActions) > 0 {
+		b.WriteString("### Prioritized actions\n\n")
+		for _, a := range ga.PrioritizedActions {
+			fmt.Fprintf(b, "1. %s\n", a)
+		}
+		b.WriteString("\n")
+	}
+	if len(ga.RecommendedNorms) > 0 {
+		b.WriteString("### Recommended governance norms\n\n")
+		for _, n := range ga.RecommendedNorms {
+			fmt.Fprintf(b, "- %s\n", n)
+		}
+		b.WriteString("\n")
+	}
 }
 
 func renderInvalidMetric(b *strings.Builder, m model.MetricAnalysis) {

@@ -74,6 +74,12 @@ func Annotate(metrics []model.MetricAnalysis, t Thresholds) model.StorageImpactS
 	for i := range metrics {
 		si := Compute(metrics[i], t)
 		metrics[i].StorageImpact = &si
+		// TSDB storage-optimization recommendation: appended (never replacing
+		// existing recommendations) only when storage impact or high cardinality
+		// warrants it. Heuristic — index entries, not bytes.
+		if rec := storageRecommendation(metrics[i], si); rec != "" {
+			metrics[i].Recommendations = append(metrics[i].Recommendations, rec)
+		}
 		switch si.ImpactLevel {
 		case "high":
 			summary.HighImpactMetrics++
@@ -101,6 +107,27 @@ func Annotate(metrics []model.MetricAnalysis, t Thresholds) model.StorageImpactS
 	}
 	summary.TopStorageImpactMetrics = refs
 	return summary
+}
+
+// storageRecommendation returns a concrete TSDB storage-optimization
+// recommendation when the metric's impact is high/medium OR it is flagged
+// high_cardinality; otherwise "". Heuristic: index entries, not disk bytes.
+func storageRecommendation(m model.MetricAnalysis, si model.StorageImpact) string {
+	warranted := si.ImpactLevel == "high" || si.ImpactLevel == "medium"
+	for _, t := range m.InvalidTypes {
+		if t == "high_cardinality" {
+			warranted = true
+		}
+	}
+	if !warranted {
+		return ""
+	}
+	topLabel, topCard := "-", 0
+	if len(si.TopCardinalityLabels) > 0 {
+		topLabel = si.TopCardinalityLabels[0].LabelKey
+		topCard = si.TopCardinalityLabels[0].Cardinality
+	}
+	return fmt.Sprintf("TSDB storage optimization: reduce label %q (%d distinct) — ~%d estimated index entries (heuristic); use recording rules or drop high-cardinality labels via metric_relabel_configs.", topLabel, topCard, si.EstimatedIndexEntries)
 }
 
 // Compute builds the per-metric storage impact.

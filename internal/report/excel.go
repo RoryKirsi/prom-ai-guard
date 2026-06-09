@@ -20,6 +20,7 @@ const (
 	sheetTopViolation = "Top Violation Labels"
 	sheetWarnings     = "Warnings"
 	sheetStorage      = "Storage Impact"
+	sheetGovernance   = "Governance"
 )
 
 // xlStyles holds the reusable cell styles (header + per-risk fills).
@@ -43,7 +44,7 @@ func WriteExcel(r Report, path string) error {
 	if err := f.SetSheetName("Sheet1", sheetSummary); err != nil {
 		return fmt.Errorf("excel sheet init: %w", err)
 	}
-	for _, name := range []string{sheetInvalid, sheetTopRisk, sheetTopViolation, sheetWarnings, sheetStorage} {
+	for _, name := range []string{sheetInvalid, sheetTopRisk, sheetTopViolation, sheetWarnings, sheetStorage, sheetGovernance} {
 		if _, err := f.NewSheet(name); err != nil {
 			return fmt.Errorf("excel new sheet %q: %w", name, err)
 		}
@@ -66,6 +67,9 @@ func WriteExcel(r Report, path string) error {
 		return err
 	}
 	if err := writeStorageSheet(f, styles, r); err != nil {
+		return err
+	}
+	if err := writeGovernanceSheet(f, styles, r); err != nil {
 		return err
 	}
 
@@ -229,6 +233,40 @@ func writeTopViolationSheet(f *excelize.File, st xlStyles, r Report) error {
 
 // writeStorageSheet writes the deterministic TSDB-index storage-impact
 // simulation. estimated_index_entries is heuristic, not real TSDB bytes.
+func writeGovernanceSheet(f *excelize.File, st xlStyles, r Report) error {
+	if err := header(f, sheetGovernance, []string{"Field", "Value"}, []float64{28, 100}, st); err != nil {
+		return err
+	}
+	ga := r.Summary.GovernanceAssessment
+	row := 2
+	put := func(k string, v interface{}) {
+		_ = f.SetCellValue(sheetGovernance, cell(1, row), k)
+		_ = f.SetCellValue(sheetGovernance, cell(2, row), v)
+		row++
+	}
+	if ga == nil {
+		put("governance_assessment", "none")
+		return nil
+	}
+	put("maturity_grade", ga.MaturityGrade)
+	put("maturity_score", ga.MaturityScore)
+	put("maturity_heuristic", ga.MaturityHeuristic)
+	put("invalid_ratio", ga.InvalidRatio)
+	put("total_invalid", ga.TotalInvalid)
+	put("risk_distribution", fmt.Sprintf("severe=%d warning=%d minor=%d",
+		ga.RiskDistribution["severe"], ga.RiskDistribution["warning"], ga.RiskDistribution["minor"]))
+	for _, s := range ga.TopSystemicIssues {
+		put("systemic_issue", fmt.Sprintf("%s — %d metric(s), max %s(%d)", s.InvalidType, s.MetricCount, s.MaxRisk, s.MaxScore))
+	}
+	for _, a := range ga.PrioritizedActions {
+		put("prioritized_action", a)
+	}
+	for _, n := range ga.RecommendedNorms {
+		put("recommended_norm", n)
+	}
+	return nil
+}
+
 func writeStorageSheet(f *excelize.File, st xlStyles, r Report) error {
 	cols := []string{"metric_name", "series_count", "label_count", "max_label_cardinality",
 		"top_cardinality_labels", "estimated_index_entries", "impact_level", "reason"}

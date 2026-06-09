@@ -24,6 +24,10 @@ type Summary struct {
 	// Slice 12 additive: aggregate TSDB-index storage-impact simulation. Nested
 	// here (summary.storage_impact) rather than a new top-level report key.
 	StorageImpact *model.StorageImpactSummary `json:"storage_impact,omitempty"`
+	// Slice 16 additive: deterministic batch-level governance assessment. Also
+	// nested under summary (summary.governance_assessment) — never a top-level key,
+	// so schema_version stays v1. Always present (local_rules and fallback runs).
+	GovernanceAssessment *model.GovernanceAssessment `json:"governance_assessment,omitempty"`
 }
 
 // Result bundles everything the rule pass produces for the report.

@@ -33,6 +33,16 @@ func PrintConsole(w io.Writer, r Report) {
 			si.HighImpactMetrics, si.MediumImpactMetrics, si.LowImpactMetrics, si.EstimatedInvalidIndexEntries)
 	}
 
+	if ga := s.GovernanceAssessment; ga != nil {
+		top := "none"
+		if len(ga.TopSystemicIssues) > 0 {
+			t := ga.TopSystemicIssues[0]
+			top = fmt.Sprintf("%s(%s×%d)", t.InvalidType, t.MaxRisk, t.MetricCount)
+		}
+		fmt.Fprintf(w, "  governance:         grade %s (score %d, heuristic) top_issue=%s\n",
+			ga.MaturityGrade, ga.MaturityScore, top)
+	}
+
 	if r.AI != nil {
 		fmt.Fprintf(w, "  ai:                 %s (mode=%s model=%s analyzed=%d)\n",
 			r.AI.Status, r.AI.AIMode, r.AI.Model, r.AI.AnalyzedMetricCount)
